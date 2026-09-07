@@ -4,11 +4,14 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mindlizzard.feetstudio.ai.GeminiClient
+import com.mindlizzard.feetstudio.ai.MuapiFluxClient
 import com.mindlizzard.feetstudio.data.DeviceExportRepository
 import com.mindlizzard.feetstudio.data.GalleryRepository
+import com.mindlizzard.feetstudio.data.MuapiKeyStore
 import com.mindlizzard.feetstudio.data.SecureKeyStore
 import com.mindlizzard.feetstudio.domain.DesignState
 import com.mindlizzard.feetstudio.domain.FixTarget
+import com.mindlizzard.feetstudio.domain.ImageEngine
 import com.mindlizzard.feetstudio.domain.QualityProfile
 import com.mindlizzard.feetstudio.domain.ReferenceAsset
 import com.mindlizzard.feetstudio.domain.RenderContract
@@ -33,21 +36,25 @@ data class StudioUiState(
     val loading: Boolean = false,
     val progress: String = "",
     val error: String? = null,
-    val apiKeyPresent: Boolean = false
+    val apiKeyPresent: Boolean = false,
+    val muapiKeyPresent: Boolean = false
 )
 
 class StudioViewModel(application: Application) : AndroidViewModel(application) {
     private val keyStore = SecureKeyStore(application)
+    private val muapiKeyStore = MuapiKeyStore(application)
     private val galleryRepo = GalleryRepository(application)
     private val exportRepo = DeviceExportRepository(application)
     private val gemini = GeminiClient(application.contentResolver)
+    private val flux = MuapiFluxClient()
     private val undo = ArrayDeque<WorkspaceState>()
     private val redo = ArrayDeque<WorkspaceState>()
 
     private val _ui = MutableStateFlow(
         StudioUiState(
             gallery = galleryRepo.list(),
-            apiKeyPresent = keyStore.loadApiKey().isNotBlank()
+            apiKeyPresent = keyStore.loadApiKey().isNotBlank(),
+            muapiKeyPresent = muapiKeyStore.loadApiKey().isNotBlank()
         )
     )
     val ui: StateFlow<StudioUiState> = _ui.asStateFlow()
@@ -150,6 +157,23 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun apiKeyForEditor(): String = keyStore.loadApiKey()
 
+    fun saveMuapiKey(value: String) {
+        runCatching {
+            muapiKeyStore.saveApiKey(value)
+        }.onSuccess {
+            _ui.value = _ui.value.copy(
+                muapiKeyPresent = muapiKeyStore.loadApiKey().isNotBlank(),
+                error = null
+            )
+        }.onFailure {
+            _ui.value = _ui.value.copy(
+                error = it.message ?: "Ongeldige MuAPI key."
+            )
+        }
+    }
+
+    fun muapiKeyForEditor(): String = muapiKeyStore.loadApiKey()
+
     fun previewContract(): RenderContract =
         RenderEngine.buildContract(
             _ui.value.workspace,
@@ -167,10 +191,23 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     fun generate() {
         if (_ui.value.loading) return
 
-        val apiKey = keyStore.loadApiKey()
-        if (apiKey.isBlank()) {
+        val settings = _ui.value.workspace.settings
+        val geminiKey = keyStore.loadApiKey()
+        val muapiKey = muapiKeyStore.loadApiKey()
+
+        if (settings.imageEngine == ImageEngine.GEMINI && geminiKey.isBlank()) {
             _ui.value = _ui.value.copy(
                 error = "Vul eerst je Gemini API-key in bij Render."
+            )
+            return
+        }
+
+        if (
+            settings.imageEngine == ImageEngine.FLUX_HOSIERY &&
+            muapiKey.isBlank()
+        ) {
+            _ui.value = _ui.value.copy(
+                error = "Vul eerst je MuAPI key in voor FLUX Hosiery Lab."
             )
             return
         }
@@ -182,54 +219,84 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             try {
-                val batch =
-                    _ui.value.workspace.settings.batchCount.coerceIn(1, 4)
+                val batch = settings.batchCount.coerceIn(1, 4)
 
                 repeat(batch) { index ->
-                    _ui.value = _ui.value.copy(
-                        progress = "Render ${index + 1}/$batch"
-                    )
-
                     val contract = previewContract()
 
-                    val firstPass = withContext(Dispatchers.IO) {
-                        gemini.generate(
-                            apiKey,
-                            contract,
-                            _ui.value.references
-                        )
-                    }
+                    val output: Pair<ByteArray, RenderContract> =
+                        when (settings.imageEngine) {
+                            ImageEngine.GEMINI -> {
+                                _ui.value = _ui.value.copy(
+                                    progress = "Gemini render ${index + 1}/$batch"
+                                )
 
-                    val finalBytes =
-                        if (
-                            _ui.value.workspace.settings.qualityProfile ==
-                            QualityProfile.ULTRA
-                        ) {
-                            _ui.value = _ui.value.copy(
-                                progress = "Ultra refinement ${index + 1}/$batch"
-                            )
-
-                            withContext(Dispatchers.IO) {
-                                runCatching {
+                                val firstPass = withContext(Dispatchers.IO) {
                                     gemini.generate(
-                                        apiKey = apiKey,
-                                        contract = contract,
-                                        references = emptyList(),
-                                        sourceImage = firstPass,
-                                        editInstruction = ultraRefineInstruction()
+                                        geminiKey,
+                                        contract,
+                                        _ui.value.references
                                     )
-                                }.getOrElse {
-                                    firstPass
                                 }
+
+                                val finalBytes =
+                                    if (
+                                        settings.qualityProfile ==
+                                        QualityProfile.ULTRA
+                                    ) {
+                                        _ui.value = _ui.value.copy(
+                                            progress =
+                                                "Ultra refinement ${index + 1}/$batch"
+                                        )
+
+                                        withContext(Dispatchers.IO) {
+                                            runCatching {
+                                                gemini.generate(
+                                                    apiKey = geminiKey,
+                                                    contract = contract,
+                                                    references = emptyList(),
+                                                    sourceImage = firstPass,
+                                                    editInstruction =
+                                                        ultraRefineInstruction()
+                                                )
+                                            }.getOrElse { firstPass }
+                                        }
+                                    } else {
+                                        firstPass
+                                    }
+
+                                finalBytes to contract
                             }
-                        } else {
-                            firstPass
+
+                            ImageEngine.FLUX_HOSIERY -> {
+                                _ui.value = _ui.value.copy(
+                                    progress =
+                                        "FLUX Hosiery ${index + 1}/$batch"
+                                )
+
+                                val bytes = withContext(Dispatchers.IO) {
+                                    flux.generate(
+                                        apiKey = muapiKey,
+                                        contract = contract,
+                                        preset = settings.hosieryLoraPreset,
+                                        weight = settings.hosieryLoraWeight
+                                    )
+                                }
+
+                                val fluxContract = contract.copy(
+                                    model =
+                                        "FLUX.1-dev + ${settings.hosieryLoraPreset.label}",
+                                    imageSize = "MuAPI"
+                                )
+
+                                bytes to fluxContract
+                            }
                         }
 
                     val record = withContext(Dispatchers.IO) {
                         galleryRepo.save(
-                            finalBytes,
-                            contract
+                            output.first,
+                            output.second
                         )
                     }
 
@@ -281,7 +348,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
         if (apiKey.isBlank()) {
             _ui.value = _ui.value.copy(
-                error = "Vul eerst je Gemini API-key in."
+                error = "Targeted Fix gebruikt Gemini. Vul eerst je Gemini API-key in."
             )
             return
         }

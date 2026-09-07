@@ -12,6 +12,44 @@ enum class ResolverMode { AUTO, ASK, STRICT, CREATIVE }
 enum class DetailPriority { BALANCED, ANATOMY, HOSIERY, FOOTWEAR, SKIN, NAILS, SCENE }
 enum class QualityProfile(val label: String) { STANDARD("Standard"), AURA("Aura"), ULTRA("Ultra 2-pass") }
 
+enum class ImageEngine(val label: String) {
+    GEMINI("Gemini"),
+    FLUX_HOSIERY("FLUX Hosiery Lab")
+}
+
+enum class HosieryLoraPreset(
+    val label: String,
+    val modelId: String,
+    val triggerWord: String
+) {
+    SHEER_15D(
+        "Sheer 15D",
+        "civitai:866931@970135",
+        "15tights"
+    ),
+    REINFORCED_TOE(
+        "Reinforced toe",
+        "civitai:1693845@1916978",
+        "reinforced toes"
+    ),
+    SHINY(
+        "Shiny pantyhose",
+        "civitai:865294@1241316",
+        "shiny pantyhose"
+    ),
+    AURORA_8D(
+        "Aurora 8D",
+        "civitai:1051712@1180123",
+        "Tutu Aurora 8D Pantyhose"
+    ),
+    METALLIC(
+        "Metallic / lamé",
+        "civitai:1320762@1491138",
+        "lame pantyhose"
+    )
+}
+
+
 enum class FootShape(val label: String) {
     GREEK("Greek / second toe longer"), EGYPTIAN("Egyptian / tapered"), ROMAN("Roman / square"),
     PEASANT("Broad / peasant"), MOUNTAIN_PEAK("Mountain peak"), PETITE("Petite"), SLENDER("Slender / model"),
@@ -225,6 +263,9 @@ data class StudioSettings(
     val detailPriority: DetailPriority = DetailPriority.BALANCED,
     val qualityProfile: QualityProfile = QualityProfile.AURA,
     val anatomyGuard: Boolean = true,
+    val imageEngine: ImageEngine = ImageEngine.GEMINI,
+    val hosieryLoraPreset: HosieryLoraPreset = HosieryLoraPreset.SHEER_15D,
+    val hosieryLoraWeight: Int = 85,
     val batchCount: Int = 1,
     val variationStrength: Int = 25,
     val lockFeet: Boolean = false,

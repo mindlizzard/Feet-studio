@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 0
+
 android {
     namespace = "com.mindlizzard.feetstudio"
     compileSdk = 35
@@ -12,16 +14,30 @@ android {
         applicationId = "com.mindlizzard.feetstudio.v5"
         minSdk = 29
         targetSdk = 35
-        versionCode = 50000
-        versionName = "5.0.0"
+        versionCode = 506000 + ciRunNumber
+        versionName = if (ciRunNumber > 0) "5.6.$ciRunNumber" else "5.6.0"
 
         vectorDrawables {
             useSupportLibrary = true
         }
     }
 
+    signingConfigs {
+        create("feetStudioDev") {
+            storeFile = rootProject.file("keys/feet-studio-dev.jks")
+            storePassword = "feetstudio-dev-2026"
+            keyAlias = "feet-studio-dev"
+            keyPassword = "feetstudio-dev-2026"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("feetStudioDev")
+        }
+
         release {
+            signingConfig = signingConfigs.getByName("feetStudioDev")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

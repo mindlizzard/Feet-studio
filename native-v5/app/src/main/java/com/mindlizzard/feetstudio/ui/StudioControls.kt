@@ -238,6 +238,59 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: Studi
         }
     }
 
+    item {
+        EnumChips(
+            "Image engine",
+            ImageEngine.entries,
+            workspace.settings.imageEngine,
+            { it.label }
+        ) { value ->
+            vm.updateSettings {
+                it.copy(imageEngine = value)
+            }
+        }
+    }
+
+    if (workspace.settings.imageEngine == ImageEngine.FLUX_HOSIERY) {
+        item { SectionTitle("FLUX Hosiery Lab") }
+
+        item {
+            EnumChips(
+                "Hosiery LoRA",
+                HosieryLoraPreset.entries,
+                workspace.settings.hosieryLoraPreset,
+                { it.label }
+            ) { value ->
+                vm.updateSettings {
+                    it.copy(hosieryLoraPreset = value)
+                }
+            }
+        }
+
+        item {
+            IntSlider(
+                "LoRA strength",
+                workspace.settings.hosieryLoraWeight,
+                0,
+                100
+            ) { value ->
+                vm.updateSettings {
+                    it.copy(hosieryLoraWeight = value)
+                }
+            }
+        }
+
+        item {
+            Text(
+                "Experimenteel: FLUX.1-dev + gespecialiseerde hosiery LoRA via MuAPI. References worden in deze eerste versie niet meegestuurd.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        item { MuapiKeyEditor(vm) }
+    }
+
     if (workspace.settings.qualityProfile == QualityProfile.ULTRA) {
         item {
             Text(
@@ -275,7 +328,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: Studi
         }
         item { TextButton(onClick = vm::clearReferences, modifier = Modifier.fillMaxWidth()) { Text("Clear all references") } }
     }
-    item { SectionTitle("Gemini API key") }
+    item { SectionTitle("Gemini API key / Targeted Fix") }
     item { ApiKeyEditor(vm) }
 }
 
@@ -292,6 +345,35 @@ private fun ReferenceEditor(index: Int, asset: ReferenceAsset, onRole: (Referenc
             EnumChips("Strength", ReferenceStrength.entries, asset.strength, { it.label }, onStrength)
             TextButton(onClick = onRemove, modifier = Modifier.fillMaxWidth()) { Text("Remove") }
         }
+    }
+}
+
+@Composable
+private fun MuapiKeyEditor(vm: StudioViewModel) {
+    var value by remember { mutableStateOf(vm.muapiKeyForEditor()) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { value = it },
+            label = { Text("MuAPI key") },
+            visualTransformation = PasswordVisualTransformation(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Button(
+            onClick = { vm.saveMuapiKey(value) },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Save MuAPI key")
+        }
+
+        Text(
+            "Encrypted lokaal. Nodig voor FLUX Hosiery Lab via MuAPI.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
