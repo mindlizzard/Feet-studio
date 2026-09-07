@@ -214,6 +214,48 @@ private fun androidx.compose.foundation.lazy.LazyListScope.sceneItems(vm: Studio
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: StudioViewModel, workspace: WorkspaceState, references: List<ReferenceAsset>, onPickReferences: () -> Unit) {
+    item {
+        EnumChips(
+            "Quality profile",
+            QualityProfile.entries,
+            workspace.settings.qualityProfile,
+            { it.label }
+        ) { value ->
+            vm.updateSettings {
+                it.copy(qualityProfile = value)
+            }
+        }
+    }
+
+    item {
+        SwitchRow(
+            "Anatomy guard",
+            workspace.settings.anatomyGuard
+        ) { value ->
+            vm.updateSettings {
+                it.copy(anatomyGuard = value)
+            }
+        }
+    }
+
+    if (workspace.settings.qualityProfile == QualityProfile.ULTRA) {
+        item {
+            Text(
+                "Ultra gebruikt Pro + 4K en daarna een tweede refinement-pass. Dit kost ongeveer twee image-calls per render.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    } else if (workspace.settings.qualityProfile == QualityProfile.AURA) {
+        item {
+            Text(
+                "Aura geeft strengere anatomie, scherper materiaal-detail en natuurlijkere fotografie zonder extra tweede pass.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
     item { EnumChips("Mode", RenderMode.entries, workspace.settings.renderMode, { it.name.lowercase() }) { v -> vm.updateSettings { it.copy(renderMode = v, resolution = if (v == RenderMode.PRO) Resolution.K4 else it.resolution) } } }
     item { EnumChips("Resolution", Resolution.entries, workspace.settings.resolution, { it.name.replace("K", "") + "K" }) { v -> vm.updateSettings { it.copy(resolution = v) } } }
     item { EnumChips("Resolver", ResolverMode.entries, workspace.settings.resolverMode, { it.name.lowercase() }) { v -> vm.updateSettings { it.copy(resolverMode = v) } } }
@@ -259,7 +301,7 @@ private fun ApiKeyEditor(vm: StudioViewModel) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(value = value, onValueChange = { value = it }, label = { Text("API key") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
         Button(onClick = { vm.saveApiKey(value) }, modifier = Modifier.fillMaxWidth()) { Text("Save in Android Keystore") }
-        Text("Encrypted locally on this device. The key is not compiled into the APK.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Encrypted locally. Plak alleen de Gemini API-key zelf, op één regel.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

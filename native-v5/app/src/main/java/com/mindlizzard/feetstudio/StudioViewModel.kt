@@ -9,11 +9,11 @@ import com.mindlizzard.feetstudio.data.GalleryRepository
 import com.mindlizzard.feetstudio.data.SecureKeyStore
 import com.mindlizzard.feetstudio.domain.DesignState
 import com.mindlizzard.feetstudio.domain.FixTarget
+import com.mindlizzard.feetstudio.domain.QualityProfile
 import com.mindlizzard.feetstudio.domain.ReferenceAsset
 import com.mindlizzard.feetstudio.domain.RenderContract
 import com.mindlizzard.feetstudio.domain.RenderEngine
 import com.mindlizzard.feetstudio.domain.RenderRecord
-import com.mindlizzard.feetstudio.domain.RenderMode
 import com.mindlizzard.feetstudio.domain.StudioSettings
 import com.mindlizzard.feetstudio.domain.WorkspaceState
 import kotlinx.coroutines.Dispatchers
@@ -98,11 +98,17 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         _ui.value = _ui.value.copy(references = emptyList())
     }
 
-    fun updateReferenceRole(index: Int, role: com.mindlizzard.feetstudio.domain.ReferenceRole) {
+    fun updateReferenceRole(
+        index: Int,
+        role: com.mindlizzard.feetstudio.domain.ReferenceRole
+    ) {
         updateReference(index) { it.copy(role = role) }
     }
 
-    fun updateReferenceStrength(index: Int, strength: com.mindlizzard.feetstudio.domain.ReferenceStrength) {
+    fun updateReferenceStrength(
+        index: Int,
+        strength: com.mindlizzard.feetstudio.domain.ReferenceStrength
+    ) {
         updateReference(index) { it.copy(strength = strength) }
     }
 
@@ -128,14 +134,27 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun saveApiKey(value: String) {
-        keyStore.saveApiKey(value)
-        _ui.value = _ui.value.copy(apiKeyPresent = value.isNotBlank())
+        runCatching {
+            keyStore.saveApiKey(value)
+        }.onSuccess {
+            _ui.value = _ui.value.copy(
+                apiKeyPresent = keyStore.loadApiKey().isNotBlank(),
+                error = null
+            )
+        }.onFailure {
+            _ui.value = _ui.value.copy(
+                error = it.message ?: "Ongeldige Gemini API-key."
+            )
+        }
     }
 
     fun apiKeyForEditor(): String = keyStore.loadApiKey()
 
     fun previewContract(): RenderContract =
-        RenderEngine.buildContract(_ui.value.workspace, _ui.value.references)
+        RenderEngine.buildContract(
+            _ui.value.workspace,
+            _ui.value.references
+        )
 
     fun select(record: RenderRecord) {
         _ui.value = _ui.value.copy(active = record)
@@ -157,63 +176,156 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         }
 
         viewModelScope.launch {
-            _ui.value = _ui.value.copy(loading = true, error = null)
+            _ui.value = _ui.value.copy(
+                loading = true,
+                error = null
+            )
+
             try {
-                val batch = _ui.value.workspace.settings.batchCount.coerceIn(1, 4)
+                val batch =
+                    _ui.value.workspace.settings.batchCount.coerceIn(1, 4)
 
                 repeat(batch) { index ->
                     _ui.value = _ui.value.copy(
-                        progress = "Native render ${index + 1}/$batch"
+                        progress = "Render ${index + 1}/$batch"
                     )
 
                     val contract = previewContract()
 
-                    val bytes = withContext(Dispatchers.IO) {
-                        gemini.generate(apiKey, contract, _ui.value.references)
+                    val firstPass = withContext(Dispatchers.IO) {
+                        gemini.generate(
+                            apiKey,
+                            contract,
+                            _ui.value.references
+                        )
                     }
 
+                    val finalBytes =
+                        if (
+                            _ui.value.workspace.settings.qualityProfile ==
+                            QualityProfile.ULTRA
+                        ) {
+                            _ui.value = _ui.value.copy(
+                                progress = "Ultra refinement ${index + 1}/$batch"
+                            )
+
+                            withContext(Dispatchers.IO) {
+                                runCatching {
+                                    gemini.generate(
+                                        apiKey = apiKey,
+                                        contract = contract,
+                                        references = emptyList(),
+                                        sourceImage = firstPass,
+                                        editInstruction = ultraRefineInstruction()
+                                    )
+                                }.getOrElse {
+                                    firstPass
+                                }
+                            }
+                        } else {
+                            firstPass
+                        }
+
                     val record = withContext(Dispatchers.IO) {
-                        galleryRepo.save(bytes, contract)
+                        galleryRepo.save(
+                            finalBytes,
+                            contract
+                        )
                     }
 
                     val all = withContext(Dispatchers.IO) {
                         galleryRepo.list()
                     }
 
-                    _ui.value = _ui.value.copy(gallery = all, active = record)
+                    _ui.value = _ui.value.copy(
+                        gallery = all,
+                        active = record
+                    )
                 }
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(
                     error = t.message ?: "Generatie mislukt."
                 )
             } finally {
-                _ui.value = _ui.value.copy(loading = false, progress = "")
+                _ui.value = _ui.value.copy(
+                    loading = false,
+                    progress = ""
+                )
             }
         }
     }
+
+    private fun ultraRefineInstruction(): String = """
+        REFINE THIS SAME IMAGE. DO NOT REDESIGN IT.
+
+        First repair structural realism if needed:
+        - both legs must trace continuously from pelvis through knees and ankles into the feet
+        - preserve natural limb lengths and left/right orientation
+        - preserve exactly one coherent shoe per intended foot
+        - correct warped toe boxes, heels, straps, soles or footwear rotation
+        - keep hosiery continuous over knees, calves, ankles and feet
+
+        Then improve photographic fidelity:
+        - sharpen real existing texture, not fake crunchy detail
+        - improve hosiery weave, skin microtexture, nail edges and shoe seams
+        - restore natural contact shadows and believable material highlights
+        - remove mushy AI blur, waxy skin and painterly artifacts
+        - preserve the same identity, pose intent, outfit, scene, crop and lighting
+
+        Do not add limbs, toes, shoes, accessories, text or decorative elements.
+    """.trimIndent()
 
     fun targetedFix(target: FixTarget) {
         val active = _ui.value.active ?: return
         val apiKey = keyStore.loadApiKey()
 
         if (apiKey.isBlank()) {
-            _ui.value = _ui.value.copy(error = "Vul eerst je Gemini API-key in.")
+            _ui.value = _ui.value.copy(
+                error = "Vul eerst je Gemini API-key in."
+            )
             return
         }
 
         val instruction = when (target) {
-            FixTarget.ANATOMY ->
-                "Correct only foot anatomy, toe count, proportions, arch and ankle plausibility."
-            FixTarget.HOSIERY ->
-                "Correct only hosiery coverage, transparency/mesh, fabric tension and clipping."
-            FixTarget.NAILS ->
-                "Correct only visible toenails, polish placement, shape, color and requested nail art."
-            FixTarget.FOOTWEAR ->
-                "Correct only footwear geometry, straps, state and clipping."
-            FixTarget.POSE ->
-                "Correct only physically implausible foot, ankle or leg pose."
-            FixTarget.REALISM ->
-                "Reduce AI artifacts only. Restore believable skin/material microtexture, sharper edges, realistic shadows and premium photo realism."
+            FixTarget.ANATOMY -> """
+                Repair structural anatomy only.
+                Trace each leg from pelvis -> hip -> knee -> shin/calf -> ankle -> heel -> foot.
+                Correct impossible crossing, disconnected joints, twisted shins, ankle rotation,
+                toe count and foot proportions.
+                Preserve styling, scene and lighting.
+            """.trimIndent()
+
+            FixTarget.HOSIERY -> """
+                Correct hosiery only.
+                Preserve continuous fabric over thighs, knees, calves, ankles and feet.
+                Restore real weave, tension, folds, transparency and contact shadows.
+                Remove painted-on texture, random holes and clipping.
+            """.trimIndent()
+
+            FixTarget.NAILS -> """
+                Correct only visible toenails, polish placement, shape, color and requested nail art.
+                Keep polish entirely on nail plates.
+            """.trimIndent()
+
+            FixTarget.FOOTWEAR -> """
+                Repair footwear geometry only.
+                Keep one coherent shoe per intended foot.
+                Correct heel cup, toe box, sole direction, straps, opening and foot placement.
+                Remove doubled heels, warped soles and shoes fused into ankles.
+            """.trimIndent()
+
+            FixTarget.POSE -> """
+                Correct only physically implausible body/leg/foot pose.
+                Preserve pose intent but restore plausible pelvis, knee and ankle articulation.
+            """.trimIndent()
+
+            FixTarget.REALISM -> """
+                Preserve the same composition and styling.
+                Fix any obvious structural anatomy or footwear warping first.
+                Then restore believable skin/material microtexture, fine hosiery weave,
+                crisp but natural edges, realistic shadows and premium photographic optics.
+                Remove mushy AI blur, waxy smoothing, fake HDR and CGI-like surfaces.
+            """.trimIndent()
         }
 
         viewModelScope.launch {
@@ -249,29 +361,50 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                     )
                 }
 
-                val all = withContext(Dispatchers.IO) { galleryRepo.list() }
-                _ui.value = _ui.value.copy(gallery = all, active = record)
+                val all = withContext(Dispatchers.IO) {
+                    galleryRepo.list()
+                }
+
+                _ui.value = _ui.value.copy(
+                    gallery = all,
+                    active = record
+                )
             } catch (t: Throwable) {
                 _ui.value = _ui.value.copy(
                     error = t.message ?: "Targeted Fix mislukt."
                 )
             } finally {
-                _ui.value = _ui.value.copy(loading = false, progress = "")
+                _ui.value = _ui.value.copy(
+                    loading = false,
+                    progress = ""
+                )
             }
         }
     }
 
     fun exportRecordAsPng(record: RenderRecord): String =
-        exportRepo.exportPng(record.imagePath, "feet-studio-${record.id}")
+        exportRepo.exportPng(
+            record.imagePath,
+            "feet-studio-${record.id}"
+        )
 
     fun exportRecordAsJpg(record: RenderRecord): String =
-        exportRepo.exportJpg(record.imagePath, "feet-studio-${record.id}")
+        exportRepo.exportJpg(
+            record.imagePath,
+            "feet-studio-${record.id}"
+        )
 
     fun exportRecordAs8kPng(record: RenderRecord): String =
-        exportRepo.export8kPng(record.imagePath, "feet-studio-${record.id}")
+        exportRepo.export8kPng(
+            record.imagePath,
+            "feet-studio-${record.id}"
+        )
 
     fun exportRecordAs8kJpg(record: RenderRecord): String =
-        exportRepo.export8kJpg(record.imagePath, "feet-studio-${record.id}")
+        exportRepo.export8kJpg(
+            record.imagePath,
+            "feet-studio-${record.id}"
+        )
 
     fun dismissError() {
         _ui.value = _ui.value.copy(error = null)

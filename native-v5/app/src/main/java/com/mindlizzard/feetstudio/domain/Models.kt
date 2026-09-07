@@ -10,6 +10,7 @@ enum class AspectRatio(val apiValue: String) {
 }
 enum class ResolverMode { AUTO, ASK, STRICT, CREATIVE }
 enum class DetailPriority { BALANCED, ANATOMY, HOSIERY, FOOTWEAR, SKIN, NAILS, SCENE }
+enum class QualityProfile(val label: String) { STANDARD("Standard"), AURA("Aura"), ULTRA("Ultra 2-pass") }
 
 enum class FootShape(val label: String) {
     GREEK("Greek / second toe longer"), EGYPTIAN("Egyptian / tapered"), ROMAN("Roman / square"),
@@ -222,6 +223,8 @@ data class StudioSettings(
     val aspectRatio: AspectRatio = AspectRatio.PORTRAIT,
     val resolverMode: ResolverMode = ResolverMode.AUTO,
     val detailPriority: DetailPriority = DetailPriority.BALANCED,
+    val qualityProfile: QualityProfile = QualityProfile.AURA,
+    val anatomyGuard: Boolean = true,
     val batchCount: Int = 1,
     val variationStrength: Int = 25,
     val lockFeet: Boolean = false,
