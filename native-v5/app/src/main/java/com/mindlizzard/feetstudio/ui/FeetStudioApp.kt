@@ -1,362 +1,321 @@
 package com.mindlizzard.feetstudio.ui
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mindlizzard.feetstudio.StudioViewModel
-import com.mindlizzard.feetstudio.domain.*
+import com.mindlizzard.feetstudio.domain.FixTarget
+import com.mindlizzard.feetstudio.domain.ReferenceAsset
+import com.mindlizzard.feetstudio.domain.ReferenceRole
+import com.mindlizzard.feetstudio.domain.ReferenceStrength
+import com.mindlizzard.feetstudio.domain.RenderRecord
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun FeetStudioApp(viewModel: StudioViewModel) {
-    val ui by viewModel.ui.collectAsStateWithLifecycle()
+fun FeetStudioApp(vm: StudioViewModel = viewModel()) {
+    val ui by vm.ui.collectAsState()
     val context = LocalContext.current
-    var sheet by remember { mutableStateOf<StudioSection?>(null) }
-    var promptInspector by remember { mutableStateOf(false) }
-    var fixMenu by remember { mutableStateOf(false) }
 
-    val refPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenMultipleDocuments()
+    var section by remember { mutableStateOf(StudioSection.STUDIO) }
+    var showControls by remember { mutableStateOf(false) }
+    var viewerRecord by remember { mutableStateOf<RenderRecord?>(null) }
+    var notice by remember { mutableStateOf<String?>(null) }
+
+    val pickReferences = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
-        uris.take(5).forEach { uri ->
-            runCatching {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }
+        if (uris.isNotEmpty()) {
+            vm.addReferences(uris.take(5).map {
+                ReferenceAsset(uri = it)
+            })
+            notice = "${uris.size.coerceAtMost(5)} referentie(s) toegevoegd"
         }
-        viewModel.addReferences(uris.take(5).map { ReferenceAsset(uri = it) })
     }
 
-    val contract = remember(ui.workspace, ui.references) { viewModel.previewContract() }
-    val bitmap = rememberFileBitmap(ui.active?.imagePath)
+    LaunchedEffect(notice) {
+        notice?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            notice = null
+        }
+    }
+
+    ui.error?.let { msg ->
+        AlertDialog(
+            onDismissRequest = vm::dismissError,
+            confirmButton = {
+                TextButton(onClick = vm::dismissError) { Text("OK") }
+            },
+            title = { Text("Fout") },
+            text = { Text(msg) }
+        )
+    }
 
     Scaffold(
+        contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Feet Studio", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "v5 Native · ${contract.model}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            CenterAlignedTopAppBar(
+                title = { Text("Feet Studio v5.4") },
+                navigationIcon = {
+                    IconButton(onClick = { viewerRecord = ui.active }) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null)
                     }
                 },
                 actions = {
-                    IconButton(onClick = viewModel::undo) { Icon(Icons.Default.Undo, "Undo") }
-                    IconButton(onClick = viewModel::redo) { Icon(Icons.Default.Redo, "Redo") }
-                    IconButton(onClick = { promptInspector = true }) { Icon(Icons.Default.Tune, "Prompt inspector") }
-                }
-            )
-        },
-        bottomBar = {
-            NavigationBar {
-                StudioSection.entries.forEach { section ->
-                    val icon = when (section) {
-                        StudioSection.STUDIO -> Icons.Default.AutoAwesome
-                        StudioSection.HOSIERY -> Icons.Default.Texture
-                        StudioSection.POSE -> Icons.Default.AccessibilityNew
-                        StudioSection.CAMERA -> Icons.Default.PhotoCamera
-                        StudioSection.SCENE -> Icons.Default.Landscape
-                        StudioSection.RENDER -> Icons.Default.Settings
+                    IconButton(onClick = { showControls = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
                     }
-                    NavigationBarItem(
-                        selected = sheet == section,
-                        onClick = { sheet = section },
-                        icon = { Icon(icon, null) },
-                        label = { Text(section.label, maxLines = 1) }
-                    )
-                }
-            }
+                },
+                windowInsets = WindowInsets.statusBars
+            )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = viewModel::generate,
-                expanded = true,
-                icon = { Icon(Icons.Default.AutoAwesome, null) },
-                text = { Text("Generate") }
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SmallFloatingActionButton(onClick = {
+                    ui.active?.let {
+                        vm.targetedFix(FixTarget.REALISM)
+                        notice = "Realism fix gestart"
+                    } ?: run {
+                        notice = "Kies eerst een render uit de gallery"
+                    }
+                }) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                }
+
+                FloatingActionButton(onClick = {
+                    vm.generate()
+                    notice = "Render gestart"
+                }) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                }
+            }
         }
-    ) { padding ->
+    ) { inner ->
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(inner)
         ) {
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.background),
-                contentAlignment = Alignment.Center
-            ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Generated render",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp),
-                        contentScale = ContentScale.Fit
-                    )
+            SectionBar(
+                selected = section,
+                onChange = {
+                    section = it
+                    showControls = true
+                }
+            )
 
-                    Row(
-                        Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        SmallFloatingActionButton(
-                            onClick = { shareRender(context, ui.active?.imagePath) }
-                        ) { Icon(Icons.Default.Share, null) }
-
-                        SmallFloatingActionButton(
-                            onClick = { fixMenu = !fixMenu }
-                        ) { Icon(Icons.Default.Build, null) }
+            ActiveRenderPanel(
+                active = ui.active,
+                loading = ui.loading,
+                progress = ui.progress,
+                onOpenViewer = {
+                    ui.active?.let { viewerRecord = it }
+                },
+                onRealismFix = {
+                    ui.active?.let {
+                        vm.targetedFix(FixTarget.REALISM)
+                        notice = "Realism fix gestart"
+                    } ?: run {
+                        notice = "Kies eerst een render"
                     }
-
-                    if (fixMenu) {
-                        Card(
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(top = 70.dp, end = 12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
+                },
+                onUseAsReference = {
+                    ui.active?.let {
+                        vm.addReferences(
+                            listOf(
+                                ReferenceAsset(
+                                    uri = Uri.fromFile(File(it.imagePath)),
+                                    role = ReferenceRole.STYLE,
+                                    strength = ReferenceStrength.GUIDED
+                                )
                             )
-                        ) {
-                            Column(Modifier.padding(8.dp)) {
-                                FixTarget.entries.forEach { target ->
-                                    TextButton(
-                                        onClick = {
-                                            fixMenu = false
-                                            viewModel.targetedFix(target)
-                                        },
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Fix ${target.name.lowercase()}")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.PhotoCamera,
-                            null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(Modifier.height(14.dp))
-                        Text("Native studio ready")
-                        Text(
-                            "Open een onderdeel onderaan en bouw je render.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        notice = "Actieve render toegevoegd als referentie"
                     }
                 }
+            )
 
-                if (ui.loading) {
-                    Surface(
-                        Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background.copy(alpha = 0.86f)
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            CircularProgressIndicator()
-                            Spacer(Modifier.height(14.dp))
-                            Text(ui.progress.ifBlank { "Rendering…" })
-                            Text(
-                                "Kotlin + Compose · geen WebView",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            ReadinessBar(contract) { promptInspector = true }
-            NativeGallery(ui.gallery, ui.active, viewModel::select)
+            AuraGalleryGrid(
+                items = ui.gallery,
+                onOpen = {
+                    vm.select(it)
+                    viewerRecord = it
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 
-    sheet?.let { section ->
+    if (showControls) {
         NativeControlSheet(
             section = section,
-            viewModel = viewModel,
+            viewModel = vm,
             workspace = ui.workspace,
             references = ui.references,
-            onPickReferences = { refPicker.launch(arrayOf("image/*")) },
-            onDismiss = { sheet = null }
+            onPickReferences = { pickReferences.launch("image/*") },
+            onDismiss = { showControls = false }
         )
     }
 
-    if (promptInspector) {
-        PromptInspectorDialog(
-            contract = contract,
-            onDismiss = { promptInspector = false }
-        )
-    }
-
-    ui.error?.let { error ->
-        AlertDialog(
-            onDismissRequest = viewModel::dismissError,
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissError) { Text("OK") }
+    viewerRecord?.let { record ->
+        AuraGalleryViewerSheet(
+            record = record,
+            onDismiss = { viewerRecord = null },
+            onShare = { shareImage(context, File(it.imagePath)) },
+            onSavePng = {
+                notice = "Opgeslagen: " + vm.exportRecordAsPng(it)
             },
-            title = { Text("Feet Studio") },
-            text = { Text(error) }
+            onSaveJpg = {
+                notice = "Opgeslagen: " + vm.exportRecordAsJpg(it)
+            },
+            onSave8kPng = {
+                notice = "8K PNG opgeslagen: " + vm.exportRecordAs8kPng(it)
+            },
+            onSave8kJpg = {
+                notice = "8K JPG opgeslagen: " + vm.exportRecordAs8kJpg(it)
+            },
+            onUseAsReference = {
+                vm.addReferences(
+                    listOf(
+                        ReferenceAsset(
+                            uri = Uri.fromFile(File(it.imagePath)),
+                            role = ReferenceRole.STYLE,
+                            strength = ReferenceStrength.GUIDED
+                        )
+                    )
+                )
+                notice = "Toegevoegd als referentie"
+            }
         )
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ReadinessBar(contract: RenderContract, onClick: () -> Unit) {
-    val warnings = contract.decisions.count { !it.applied }
-    Surface(
+private fun SectionBar(
+    selected: StudioSection,
+    onChange: (StudioSection) -> Unit
+) {
+    FlowRow(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                if (warnings == 0) "✓ Render ready" else "⚠ $warnings warning(s)",
-                style = MaterialTheme.typography.labelMedium
-            )
-            Text(
-                "${contract.imageSize} · ${contract.aspectRatio}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+        StudioSection.entries.forEach { item ->
+            AssistChip(
+                onClick = { onChange(item) },
+                label = { Text(item.label) }
             )
         }
     }
 }
 
 @Composable
-private fun NativeGallery(
-    gallery: List<RenderRecord>,
+private fun ActiveRenderPanel(
     active: RenderRecord?,
-    onSelect: (RenderRecord) -> Unit
+    loading: Boolean,
+    progress: String,
+    onOpenViewer: () -> Unit,
+    onRealismFix: () -> Unit,
+    onUseAsReference: () -> Unit
 ) {
-    if (gallery.isEmpty()) return
-    LazyRow(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .height(84.dp)
-            .background(MaterialTheme.colorScheme.surface),
-        contentPadding = PaddingValues(8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = 12.dp),
     ) {
-        items(gallery.take(40), key = { it.id }) { record ->
-            val thumb = rememberFileBitmap(record.imagePath, 240)
-            Surface(
-                modifier = Modifier
-                    .size(68.dp)
-                    .clickable { onSelect(record) },
-                shape = RoundedCornerShape(12.dp),
-                tonalElevation = if (record.id == active?.id) 8.dp else 0.dp
-            ) {
-                if (thumb != null) {
-                    Image(
-                        bitmap = thumb.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Active render", style = MaterialTheme.typography.titleSmall)
+
+            if (loading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                if (progress.isNotBlank()) {
+                    Text(
+                        progress,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
+
+            if (active == null) {
+                Text(
+                    "Nog geen actieve render. Genereer iets of open een item uit de gallery.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    "${active.imageSize} • ${active.aspectRatio} • ${active.model}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onOpenViewer, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text("Open")
+                    }
+                    TextButton(onClick = onRealismFix) { Text("Realism fix") }
+                    TextButton(onClick = onUseAsReference) { Text("Use as ref") }
+                }
+            }
         }
     }
 }
 
-@Composable
-private fun PromptInspectorDialog(
-    contract: RenderContract,
-    onDismiss: () -> Unit
-) {
-    var fullPrompt by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        },
-        dismissButton = {
-            TextButton(onClick = { fullPrompt = !fullPrompt }) {
-                Text(if (fullPrompt) "Summary" else "Full prompt")
-            }
-        },
-        title = { Text("Prompt Inspector") },
-        text = {
-            if (fullPrompt) {
-                androidx.compose.foundation.lazy.LazyColumn(
-                    Modifier.heightIn(max = 520.dp)
-                ) {
-                    item { Text(contract.prompt, style = MaterialTheme.typography.bodySmall) }
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Model: ${contract.model}")
-                    Text("Output: ${contract.imageSize} · ${contract.aspectRatio}")
-                    Text("Pose: ${contract.effective.pose.label}")
-                    Text("Camera: ${contract.effective.cameraAngle.label} · ${contract.effective.lens.label}")
-                    Text("Hosiery: ${contract.effective.hosieryType.label} · ${contract.effective.denier.label}")
-                    Text("Refs actually sent: ${contract.referenceManifest.size}")
-                    if (contract.decisions.isNotEmpty()) {
-                        HorizontalDivider()
-                        contract.decisions.forEach {
-                            Text(
-                                "${if (it.applied) "✓" else "⚠"} ${it.title}: ${it.detail}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    )
-}
-
-private fun shareRender(context: android.content.Context, path: String?) {
-    if (path == null) return
-    val source = File(path)
-    if (!source.exists()) return
-
+private fun shareImage(context: Context, source: File) {
     val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
     val extension = source.extension.lowercase().ifBlank { "jpg" }
-    val target = File(shareDir, "feet-studio-v5.$extension")
+    val target = File(shareDir, "feet-studio-share.$extension")
     source.copyTo(target, overwrite = true)
 
     val mimeType = when (extension) {
@@ -365,36 +324,17 @@ private fun shareRender(context: android.content.Context, path: String?) {
         else -> "image/jpeg"
     }
 
-    val uri: Uri = FileProvider.getUriForFile(
+    val uri = FileProvider.getUriForFile(
         context,
         "${context.packageName}.files",
         target
     )
+
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = mimeType
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    context.startActivity(Intent.createChooser(intent, "Share Feet Studio render"))
+
+    context.startActivity(Intent.createChooser(intent, "Share render"))
 }
-
-
-/*
-v5.3 Gallery Foundation notes
-- New composables available:
-  * AuraGalleryGrid(...)
-  * AuraGalleryViewerSheet(...)
-- New export helpers available on StudioViewModel:
-  * exportRecordAsPng(record)
-  * exportRecordAsJpg(record)
-
-Recommended integration:
-1) Replace the old simple gallery list/grid with AuraGalleryGrid(ui.gallery, onOpen = vm::select)
-2) When ui.active != null, open AuraGalleryViewerSheet(
-       record = ui.active,
-       onDismiss = { vm.select(null) } // or local viewer state
-       onShare = { shareImage(context, java.io.File(it.imagePath)) }
-       onSavePng = { vm.exportRecordAsPng(it) }
-       onSaveJpg = { vm.exportRecordAsJpg(it) }
-   )
-*/

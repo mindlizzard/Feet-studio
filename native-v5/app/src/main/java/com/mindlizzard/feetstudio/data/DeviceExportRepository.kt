@@ -7,7 +7,6 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import android.provider.MediaStore
 import java.io.File
-import java.io.FileOutputStream
 
 class DeviceExportRepository(private val context: Context) {
 
@@ -15,23 +14,60 @@ class DeviceExportRepository(private val context: Context) {
         val bytes = File(path).readBytes()
         return writeToPictures(
             displayName = displayName.removeSuffix(".jpg") + ".jpg",
-            mimeType = "image/jpeg",
-            writer = { out -> out.write(bytes) }
-        )
+            mimeType = "image/jpeg"
+        ) { out -> out.write(bytes) }
     }
 
     fun exportPng(path: String, displayName: String): String {
-        val bitmap = BitmapFactory.decodeFile(path)
-            ?: error("Kon afbeelding niet openen.")
+        val bitmap = decodeBitmap(path)
         return writeToPictures(
             displayName = displayName.removeSuffix(".png") + ".png",
-            mimeType = "image/png",
-            writer = { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
-                    error("PNG export mislukt.")
-                }
+            mimeType = "image/png"
+        ) { out ->
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                error("PNG export mislukt.")
             }
-        )
+        }
+    }
+
+    fun export8kJpg(path: String, displayName: String): String {
+        val bitmap = upscaleTo8k(decodeBitmap(path))
+        return writeToPictures(
+            displayName = displayName.removeSuffix(".jpg") + "-8k.jpg",
+            mimeType = "image/jpeg"
+        ) { out ->
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 96, out)) {
+                error("8K JPG export mislukt.")
+            }
+        }
+    }
+
+    fun export8kPng(path: String, displayName: String): String {
+        val bitmap = upscaleTo8k(decodeBitmap(path))
+        return writeToPictures(
+            displayName = displayName.removeSuffix(".png") + "-8k.png",
+            mimeType = "image/png"
+        ) { out ->
+            if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                error("8K PNG export mislukt.")
+            }
+        }
+    }
+
+    private fun decodeBitmap(path: String): Bitmap =
+        BitmapFactory.decodeFile(path) ?: error("Kon afbeelding niet openen.")
+
+    private fun upscaleTo8k(bitmap: Bitmap): Bitmap {
+        val width = bitmap.width
+        val height = bitmap.height
+        val longest = maxOf(width, height)
+        val targetLongest = 7680
+        if (longest >= targetLongest) return bitmap
+
+        val scale = targetLongest.toFloat() / longest.toFloat()
+        val targetWidth = (width * scale).toInt().coerceAtLeast(width)
+        val targetHeight = (height * scale).toInt().coerceAtLeast(height)
+        return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
     }
 
     private fun writeToPictures(

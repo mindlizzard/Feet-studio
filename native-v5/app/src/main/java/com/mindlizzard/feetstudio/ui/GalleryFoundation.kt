@@ -6,12 +6,14 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.TransformableState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,13 +31,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedAssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -44,7 +48,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,7 +82,7 @@ fun AuraGalleryGrid(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 140.dp),
+        columns = GridCells.Adaptive(minSize = 138.dp),
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -87,6 +90,7 @@ fun AuraGalleryGrid(
     ) {
         items(items, key = { it.id }) { item ->
             val bitmap = remember(item.imagePath) { decodeBitmap(item.imagePath) }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -100,21 +104,38 @@ fun AuraGalleryGrid(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
             ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
+                Box {
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    } else {
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Preview")
+                        }
+                    }
+
                     Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                        contentAlignment = Alignment.Center
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                                RoundedCornerShape(topEnd = 12.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Text("Preview", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "${item.imageSize} • ${item.aspectRatio}",
+                            style = MaterialTheme.typography.labelSmall
+                        )
                     }
                 }
             }
@@ -129,7 +150,10 @@ fun AuraGalleryViewerSheet(
     onDismiss: () -> Unit,
     onShare: (RenderRecord) -> Unit,
     onSavePng: (RenderRecord) -> Unit,
-    onSaveJpg: (RenderRecord) -> Unit
+    onSaveJpg: (RenderRecord) -> Unit,
+    onSave8kPng: (RenderRecord) -> Unit,
+    onSave8kJpg: (RenderRecord) -> Unit,
+    onUseAsReference: (RenderRecord) -> Unit
 ) {
     var scale by remember(record.id) { mutableFloatStateOf(1f) }
     var offsetX by remember(record.id) { mutableFloatStateOf(0f) }
@@ -184,8 +208,6 @@ fun AuraGalleryViewerSheet(
                     }
                 )
 
-                Spacer(Modifier.size(8.dp))
-
                 Text(
                     text = "${record.imageSize} • ${record.aspectRatio} • ${record.model}",
                     modifier = Modifier.padding(horizontal = 20.dp),
@@ -193,12 +215,47 @@ fun AuraGalleryViewerSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                TextButton(
-                    onClick = { onSaveJpg(record) },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                Spacer(Modifier.size(8.dp))
+
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Save JPG")
+                    ElevatedAssistChip(
+                        onClick = { onUseAsReference(record) },
+                        label = { Text("Use as reference") },
+                        leadingIcon = {
+                            Icon(Icons.Default.ZoomIn, contentDescription = null)
+                        }
+                    )
+                    ElevatedAssistChip(
+                        onClick = { onSaveJpg(record) },
+                        label = { Text("Save JPG") }
+                    )
+                    ElevatedAssistChip(
+                        onClick = { onSavePng(record) },
+                        label = { Text("Save PNG") }
+                    )
+                    ElevatedAssistChip(
+                        onClick = { onSave8kJpg(record) },
+                        label = { Text("Export 8K JPG") },
+                        leadingIcon = {
+                            Icon(Icons.Default.HighQuality, contentDescription = null)
+                        }
+                    )
+                    ElevatedAssistChip(
+                        onClick = { onSave8kPng(record) },
+                        label = { Text("Export 8K PNG") },
+                        leadingIcon = {
+                            Icon(Icons.Default.HighQuality, contentDescription = null)
+                        }
+                    )
                 }
+
+                Spacer(Modifier.size(8.dp))
             }
         }
     }
@@ -210,7 +267,7 @@ private fun ZoomableGalleryImage(
     scale: Float,
     offsetX: Float,
     offsetY: Float,
-    transformState: androidx.compose.foundation.gestures.TransformableState,
+    transformState: TransformableState,
     onReset: () -> Unit
 ) {
     val bitmap = remember(path) { decodeBitmap(path) }
@@ -224,9 +281,7 @@ private fun ZoomableGalleryImage(
                 shape = RoundedCornerShape(24.dp)
             )
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = { onReset() }
-                )
+                detectTapGestures(onDoubleTap = { onReset() })
             },
         contentAlignment = Alignment.Center
     ) {
@@ -254,7 +309,7 @@ private fun ZoomableGalleryImage(
 
 private fun decodeBitmap(path: String): Bitmap? =
     runCatching {
-        val f = File(path)
-        if (!f.exists()) return null
-        BitmapFactory.decodeFile(f.absolutePath)
+        val file = File(path)
+        if (!file.exists()) return null
+        BitmapFactory.decodeFile(file.absolutePath)
     }.getOrNull()

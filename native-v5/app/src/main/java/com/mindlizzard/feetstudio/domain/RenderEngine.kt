@@ -161,7 +161,7 @@ object RenderEngine {
         val resolverText = if (decisions.isEmpty()) "No resolver adjustments." else decisions.joinToString("\n") { "- ${it.title}: ${it.detail}${if (it.applied) " [applied]" else ""}" }
 
         return """
-            Create ONE photorealistic adult editorial beauty/fashion photograph with Aura-grade realism, crisp detail and natural optics, focused on feet, legwear, footwear and pose fidelity.
+            Create ONE photorealistic adult editorial beauty/fashion photograph with premium Aura-grade realism, tack-sharp subject detail, natural optics and crisp material fidelity, focused on feet, legwear, footwear and pose fidelity.
 
             AUTHORITY ORDER:
             1. Physical visibility and occlusion.
@@ -221,6 +221,12 @@ object RenderEngine {
             duplicated accessories, watermark, text artifacts.
 
             
+            FINAL OUTPUT LOOK:
+            High-end editorial DSLR / premium-camera look.
+            Strong perceived sharpness without oversharpening.
+            Clean edge definition on hosiery threads, toes, nails, straps and seams.
+            Natural skin texture, realistic lens depth, no muddy blur and no cheap AI softness.
+
             AURA FIDELITY TARGET:
             High micro-contrast but natural skin texture. Crisp focus on the intended subject plane.
             Preserve fine hosiery weave, thread edges, footwear seams, pores, natural specular highlights
