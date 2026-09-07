@@ -31,3 +31,8 @@ dist-ssr
 android/.gradle/
 android/local.properties
 release/
+
+# Feet Studio v5 native Android
+native-v5/.gradle/
+native-v5/**/build/
+native-v5/local.properties
