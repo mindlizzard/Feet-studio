@@ -214,7 +214,7 @@ fun FeetStudioApp(viewModel: StudioViewModel) {
             section = section,
             viewModel = viewModel,
             workspace = ui.workspace,
-            referenceCount = ui.references.size,
+            references = ui.references,
             onPickReferences = { refPicker.launch(arrayOf("image/*")) },
             onDismiss = { sheet = null }
         )
