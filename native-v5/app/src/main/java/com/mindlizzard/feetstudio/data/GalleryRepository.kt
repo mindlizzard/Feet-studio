@@ -77,3 +77,6 @@ class GalleryRepository(private val context: Context) {
         )
     }.getOrNull()
 }
+
+
+fun RenderRecord.displayName(): String = "feet-studio-${'$'}id"

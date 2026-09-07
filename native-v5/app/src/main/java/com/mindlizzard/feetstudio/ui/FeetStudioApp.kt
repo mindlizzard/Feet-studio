@@ -377,3 +377,24 @@ private fun shareRender(context: android.content.Context, path: String?) {
     }
     context.startActivity(Intent.createChooser(intent, "Share Feet Studio render"))
 }
+
+
+/*
+v5.3 Gallery Foundation notes
+- New composables available:
+  * AuraGalleryGrid(...)
+  * AuraGalleryViewerSheet(...)
+- New export helpers available on StudioViewModel:
+  * exportRecordAsPng(record)
+  * exportRecordAsJpg(record)
+
+Recommended integration:
+1) Replace the old simple gallery list/grid with AuraGalleryGrid(ui.gallery, onOpen = vm::select)
+2) When ui.active != null, open AuraGalleryViewerSheet(
+       record = ui.active,
+       onDismiss = { vm.select(null) } // or local viewer state
+       onShare = { shareImage(context, java.io.File(it.imagePath)) }
+       onSavePng = { vm.exportRecordAsPng(it) }
+       onSaveJpg = { vm.exportRecordAsJpg(it) }
+   )
+*/

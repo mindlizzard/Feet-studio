@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mindlizzard.feetstudio.ai.GeminiClient
 import com.mindlizzard.feetstudio.data.GalleryRepository
+import com.mindlizzard.feetstudio.data.DeviceExportRepository
 import com.mindlizzard.feetstudio.data.SecureKeyStore
 import com.mindlizzard.feetstudio.domain.*
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ data class StudioUiState(
 class StudioViewModel(application: Application) : AndroidViewModel(application) {
     private val keyStore = SecureKeyStore(application)
     private val galleryRepo = GalleryRepository(application)
+    private val exportRepo = DeviceExportRepository(application)
     private val gemini = GeminiClient(application.contentResolver)
     private val undo = ArrayDeque<WorkspaceState>()
     private val redo = ArrayDeque<WorkspaceState>()

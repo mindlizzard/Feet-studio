@@ -161,7 +161,7 @@ object RenderEngine {
         val resolverText = if (decisions.isEmpty()) "No resolver adjustments." else decisions.joinToString("\n") { "- ${it.title}: ${it.detail}${if (it.applied) " [applied]" else ""}" }
 
         return """
-            Create ONE photorealistic adult fashion/editorial photograph focused on feet, legwear, footwear and pose fidelity.
+            Create ONE photorealistic adult editorial beauty/fashion photograph with Aura-grade realism, crisp detail and natural optics, focused on feet, legwear, footwear and pose fidelity.
 
             AUTHORITY ORDER:
             1. Physical visibility and occlusion.
@@ -220,7 +220,15 @@ object RenderEngine {
             bare sole leaking through foot-covering hosiery, plastic skin, CGI look, random duplicate limbs,
             duplicated accessories, watermark, text artifacts.
 
-            FINAL CHECK:
+            
+            AURA FIDELITY TARGET:
+            High micro-contrast but natural skin texture. Crisp focus on the intended subject plane.
+            Preserve fine hosiery weave, thread edges, footwear seams, pores, natural specular highlights
+            and realistic contact shadows. Avoid mushy edges, waxy skin, watercolor blur, over-smoothed AI look,
+            haloing and fake HDR. Render as if captured on a good camera with believable lens behavior.
+            If the selected output is 4K or Pro, make it suitable for later 8K upscale without adding fake details.
+
+FINAL CHECK:
             Exactly five toes per visible foot; coherent left/right anatomy; no material clipping;
             no contradiction with opaque coverage.
         """.trimIndent()
