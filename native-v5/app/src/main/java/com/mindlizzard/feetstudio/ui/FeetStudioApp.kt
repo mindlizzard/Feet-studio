@@ -355,8 +355,15 @@ private fun shareRender(context: android.content.Context, path: String?) {
     if (!source.exists()) return
 
     val shareDir = File(context.cacheDir, "share").apply { mkdirs() }
-    val target = File(shareDir, "feet-studio-v5.png")
+    val extension = source.extension.lowercase().ifBlank { "jpg" }
+    val target = File(shareDir, "feet-studio-v5.$extension")
     source.copyTo(target, overwrite = true)
+
+    val mimeType = when (extension) {
+        "png" -> "image/png"
+        "webp" -> "image/webp"
+        else -> "image/jpeg"
+    }
 
     val uri: Uri = FileProvider.getUriForFile(
         context,
@@ -364,7 +371,7 @@ private fun shareRender(context: android.content.Context, path: String?) {
         target
     )
     val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/png"
+        type = mimeType
         putExtra(Intent.EXTRA_STREAM, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }

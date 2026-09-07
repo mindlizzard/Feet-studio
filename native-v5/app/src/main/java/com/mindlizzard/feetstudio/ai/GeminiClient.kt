@@ -38,7 +38,7 @@ class GeminiClient(
             input.put(
                 JSONObject()
                     .put("type", "image")
-                    .put("mime_type", "image/png")
+                    .put("mime_type", detectImageMimeType(sourceImage))
                     .put("data", Base64.encodeToString(sourceImage, Base64.NO_WRAP))
             )
         }
@@ -80,7 +80,7 @@ class GeminiClient(
                 "response_format",
                 JSONObject()
                     .put("type", "image")
-                    .put("mime_type", "image/png")
+                    .put("mime_type", "image/jpeg")
                     .put("aspect_ratio", contract.aspectRatio)
                     .put("image_size", contract.imageSize)
             )
@@ -128,6 +128,29 @@ class GeminiClient(
             }
         }
         return null
+    }
+
+
+    private fun detectImageMimeType(bytes: ByteArray): String {
+        if (bytes.size >= 3 &&
+            bytes[0] == 0xFF.toByte() &&
+            bytes[1] == 0xD8.toByte() &&
+            bytes[2] == 0xFF.toByte()
+        ) return "image/jpeg"
+
+        if (bytes.size >= 8 &&
+            bytes[0] == 0x89.toByte() &&
+            bytes[1] == 0x50.toByte() &&
+            bytes[2] == 0x4E.toByte() &&
+            bytes[3] == 0x47.toByte()
+        ) return "image/png"
+
+        if (bytes.size >= 12 &&
+            String(bytes.copyOfRange(0, 4), Charsets.US_ASCII) == "RIFF" &&
+            String(bytes.copyOfRange(8, 12), Charsets.US_ASCII) == "WEBP"
+        ) return "image/webp"
+
+        return "image/jpeg"
     }
 
     private fun uriToBase64(uri: Uri): Pair<String, String>? = runCatching {

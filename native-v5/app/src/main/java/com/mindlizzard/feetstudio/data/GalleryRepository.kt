@@ -17,7 +17,7 @@ class GalleryRepository(private val context: Context) {
         fixTarget: String? = null
     ): RenderRecord {
         val id = UUID.randomUUID().toString()
-        val image = File(dir, "$id.png")
+        val image = File(dir, "$id.${extensionFor(imageBytes)}")
         image.writeBytes(imageBytes)
 
         val record = RenderRecord(
@@ -40,6 +40,29 @@ class GalleryRepository(private val context: Context) {
             ?.mapNotNull { readMeta(it) }
             ?.sortedByDescending { it.createdAt }
             ?: emptyList()
+
+
+    private fun extensionFor(bytes: ByteArray): String {
+        if (bytes.size >= 3 &&
+            bytes[0] == 0xFF.toByte() &&
+            bytes[1] == 0xD8.toByte() &&
+            bytes[2] == 0xFF.toByte()
+        ) return "jpg"
+
+        if (bytes.size >= 8 &&
+            bytes[0] == 0x89.toByte() &&
+            bytes[1] == 0x50.toByte() &&
+            bytes[2] == 0x4E.toByte() &&
+            bytes[3] == 0x47.toByte()
+        ) return "png"
+
+        if (bytes.size >= 12 &&
+            String(bytes.copyOfRange(0, 4), Charsets.US_ASCII) == "RIFF" &&
+            String(bytes.copyOfRange(8, 12), Charsets.US_ASCII) == "WEBP"
+        ) return "webp"
+
+        return "jpg"
+    }
 
     private fun writeMeta(record: RenderRecord) {
         val json = JSONObject()
