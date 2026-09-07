@@ -40,6 +40,7 @@ import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedAssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -143,7 +144,7 @@ fun AuraGalleryGrid(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AuraGalleryViewerSheet(
     record: RenderRecord,
@@ -166,8 +167,7 @@ fun AuraGalleryViewerSheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        windowInsets = WindowInsets.systemBars
+        onDismissRequest = onDismiss
     ) {
         Scaffold(
             contentWindowInsets = WindowInsets.navigationBars,
