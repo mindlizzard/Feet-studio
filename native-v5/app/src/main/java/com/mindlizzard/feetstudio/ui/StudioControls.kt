@@ -337,6 +337,7 @@ private fun LockToggle(label: String, value: Boolean, onChange: (Boolean) -> Uni
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun <T> EnumChips(
     label: String,
