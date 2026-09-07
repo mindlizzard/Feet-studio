@@ -1,16 +1,17 @@
 {
-  "name": "velvetsole-designer",
+  "name": "feet-studio-v4",
   "private": true,
-  "version": "0.0.0",
+  "version": "4.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^19.2.0",
-    "@google/genai": "^1.30.0",
+    "@google/genai": "2.21.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {

@@ -166,7 +166,8 @@ const PoseVisualizer: React.FC<Props> = ({ state }) => {
 
     // Check if covered by opaque hosiery (D60, D100, Socks)
     const isSock = state.hosieryType === HosieryType.ANKLE_SOCKS || state.hosieryType === HosieryType.TOE_SOCKS;
-    const isOpaque = isSock || state.hosieryDenier === HosieryDenier.D60 || state.hosieryDenier === HosieryDenier.D100;
+    const isFishnet = state.hosieryType === HosieryType.FISHNET;
+    const isOpaque = !isFishnet && (isSock || state.hosieryDenier === HosieryDenier.D60 || state.hosieryDenier === HosieryDenier.D100);
 
     // CRITICAL: If opaque hosiery is worn OR closed shoes are worn, return plain base skin.
     // This PREVENTS texture bleed-through (veins/sweat) entirely by not rendering them at all.
