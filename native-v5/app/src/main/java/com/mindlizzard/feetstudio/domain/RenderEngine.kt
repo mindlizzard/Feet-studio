@@ -11,6 +11,25 @@ object RenderEngine {
         val requested = workspace.design
         val normalized = normalize(requested)
         val (effective, decisions) = resolve(normalized, workspace.settings)
+        if (!SceneCatalog.isSurfaceCompatible(effective.scene, effective.surface)) {
+            when (settings.resolverMode) {
+                ResolverMode.AUTO, ResolverMode.STRICT -> {
+                    effective = effective.copy(surface = SceneCatalog.defaultSurface(effective.scene))
+                    decisions += ResolverDecision(
+                        "Surface matched to scene",
+                        "The previous surface belonged to another environment, so a compatible surface was selected.",
+                        applied = true
+                    )
+                }
+                ResolverMode.ASK -> decisions += ResolverDecision(
+                    "Surface / scene mismatch",
+                    "The selected surface normally belongs to another environment.",
+                    applied = false
+                )
+                ResolverMode.CREATIVE -> Unit
+            }
+        }
+
         val facts = derive(effective)
         val manifest = references
             .filter { it.enabled }
@@ -147,7 +166,7 @@ object RenderEngine {
         if (vehicleIntent && !effective.scene.vehicle) {
             when (settings.resolverMode) {
                 ResolverMode.AUTO, ResolverMode.STRICT -> {
-                    effective = effective.copy(scene = SceneType.SPORTS_CAR, surface = "car interior / pedals")
+                    effective = effective.copy(scene = SceneType.SPORTS_CAR, surface = SceneCatalog.defaultSurface(SceneType.SPORTS_CAR))
                     decisions += ResolverDecision(
                         "Vehicle context restored",
                         "Driver or dashboard framing requires a vehicle scene.",
@@ -209,7 +228,7 @@ object RenderEngine {
         }
 
         val nails = if (facts.nailsVisible) {
-            "Visible toenails: ${state.nailShape.label}, ${state.nailStyle.label}, color ${state.nailColor}. Polish stays on nail plates only."
+            "Visible toenails: ${state.nailShape.label}, ${state.nailStyle.label}, color ${ColorCatalog.describe(state.nailColor)}. Polish stays on nail plates only."
         } else {
             "Toenails are hidden. Do not hallucinate nail color through opaque hosiery or closed footwear."
         }
@@ -217,13 +236,13 @@ object RenderEngine {
         val hosiery = when {
             !facts.wearingHosiery -> "No hosiery. Bare skin is visible where shoes do not cover the feet."
             facts.fishnet -> """
-                Fishnet hosiery, color ${state.hosieryColor}, ${state.meshSize.name.lowercase()} mesh,
+                Fishnet hosiery, color ${ColorCatalog.describe(state.hosieryColor)}, ${state.meshSize.name.lowercase()} mesh,
                 thread thickness ${state.meshThickness}/100, tension ${state.hosieryTension}/100.
                 Open mesh remains open over toes, heel and sole. Skin is visible only through mesh openings.
                 Threads have physical thickness, stretch and tiny contact shadows. Never turn fishnet into opaque tights.
             """.trimIndent()
             else -> """
-                Hosiery: ${state.hosieryType.label}, ${state.denier.label}, color ${state.hosieryColor},
+                Hosiery: ${state.hosieryType.label}, ${state.denier.label}, color ${ColorCatalog.describe(state.hosieryColor)},
                 ${state.hosieryFinish.name.lowercase()} finish, tension ${state.hosieryTension}/100,
                 wrinkles ${state.hosieryWrinkles}/100.
                 ${if (facts.opaqueHosiery) "Opaque layer: show fibers and folds; hide skin pores, veins and nail polish." else "Sheer layer: skin and nail color are optically filtered through stretched fibers."}
@@ -234,10 +253,10 @@ object RenderEngine {
         val footwear = when {
             !facts.wearingShoes -> "No footwear present."
             facts.closedShoeWorn -> """
-                Footwear: ${state.footwearType.label}, color ${state.footwearColor}, worn.
+                Footwear: ${state.footwearType.label}, color ${ColorCatalog.describe(state.footwearColor)}, worn.
                 Closed opaque footwear contains the toes completely. No toes or nail polish visible through the shoe.
             """.trimIndent()
-            else -> "Footwear: ${state.footwearType.label}, color ${state.footwearColor}, state ${state.footwearState.label}. Keep straps and shoe geometry physically plausible."
+            else -> "Footwear: ${state.footwearType.label}, color ${ColorCatalog.describe(state.footwearColor)}, state ${state.footwearState.label}. Keep straps and shoe geometry physically plausible."
         }
 
         val priority = if (settings.detailPriority == DetailPriority.BALANCED) {

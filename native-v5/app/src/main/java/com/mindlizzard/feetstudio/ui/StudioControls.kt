@@ -2,6 +2,7 @@ package com.mindlizzard.feetstudio.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -117,13 +118,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.studioItems(
     item { SectionTitle("Nails") }
     item { EnumChips("Shape", NailShape.entries, d.nailShape, { it.label }) { v -> vm.updateDesign { it.copy(nailShape = v) } } }
     item { EnumChips("Style", NailStyle.entries, d.nailStyle, { it.label }) { v -> vm.updateDesign { it.copy(nailStyle = v) } } }
-    item { TextEntry("Nail color", d.nailColor) { v -> vm.updateDesign { it.copy(nailColor = v) } } }
+    item { NamedColorPicker("Nail color", d.nailColor, ColorCatalog.nails, pro) { v -> vm.updateDesign { it.copy(nailColor = v) } } }
 
     item { SectionTitle("Shoes") }
     item { EnumChips("Footwear", FootwearType.entries, d.footwearType, { it.label }) { v -> vm.updateDesign { it.copy(footwearType = v) } } }
     if (d.footwearType != FootwearType.NONE) {
         item { EnumChips("State", FootwearState.entries, d.footwearState, { it.label }) { v -> vm.updateDesign { it.copy(footwearState = v) } } }
-        item { TextEntry("Shoe color", d.footwearColor) { v -> vm.updateDesign { it.copy(footwearColor = v) } } }
+        item { NamedColorPicker("Shoe color", d.footwearColor, ColorCatalog.footwear, pro) { v -> vm.updateDesign { it.copy(footwearColor = v) } } }
     }
 
     item { SectionTitle("Light") }
@@ -146,7 +147,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.hosieryItems(
         if (d.hosieryType != HosieryType.FISHNET) {
             item { EnumChips("Denier", Denier.entries, d.denier, { it.label }) { v -> vm.updateDesign { it.copy(denier = v) } } }
         }
-        item { TextEntry("Color", d.hosieryColor) { v -> vm.updateDesign { it.copy(hosieryColor = v) } } }
+        item { NamedColorPicker("Color", d.hosieryColor, ColorCatalog.hosiery, pro) { v -> vm.updateDesign { it.copy(hosieryColor = v) } } }
         item { EnumChips("Finish", HosieryFinish.entries, d.hosieryFinish, { it.name.lowercase() }) { v -> vm.updateDesign { it.copy(hosieryFinish = v) } } }
 
         if (d.hosieryType == HosieryType.FISHNET) {
@@ -199,8 +200,29 @@ private fun androidx.compose.foundation.lazy.LazyListScope.sceneItems(
     vm: StudioViewModel,
     workspace: WorkspaceState
 ) {
-    item { EnumChips("Environment", SceneType.entries, workspace.design.scene, { it.label }) { v -> vm.updateDesign { it.copy(scene = v) } } }
-    item { TextEntry("Surface / interaction", workspace.design.surface) { v -> vm.updateDesign { it.copy(surface = v) } } }
+    val pro = workspace.settings.mode == StudioMode.PRO
+
+    item {
+        ScenePicker(
+            scene = workspace.design.scene,
+            onChange = { selected ->
+                vm.updateDesign {
+                    it.copy(
+                        scene = selected,
+                        surface = SceneCatalog.defaultSurface(selected)
+                    )
+                }
+            }
+        )
+    }
+    item {
+        SurfacePicker(
+            scene = workspace.design.scene,
+            surface = workspace.design.surface,
+            pro = pro,
+            onChange = { value -> vm.updateDesign { it.copy(surface = value) } }
+        )
+    }
     item { LockToggle("Lock scene", workspace.settings.lockScene) { v -> vm.updateSettings { it.copy(lockScene = v) } } }
 }
 
@@ -326,6 +348,149 @@ private fun TextEntry(label: String, value: String, onChange: (String) -> Unit) 
         modifier = Modifier.fillMaxWidth(),
         singleLine = true
     )
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun NamedColorPicker(
+    label: String,
+    value: String,
+    colors: List<NamedColor>,
+    showCustom: Boolean,
+    onChange: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium)
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            colors.forEach { option ->
+                val swatch = runCatching {
+                    androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(option.hex))
+                }.getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
+
+                FilterChip(
+                    selected = option.hex.equals(value, ignoreCase = true),
+                    onClick = { onChange(option.hex) },
+                    leadingIcon = {
+                        Surface(
+                            modifier = Modifier.size(16.dp),
+                            shape = androidx.compose.foundation.shape.CircleShape,
+                            color = swatch,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                            )
+                        ) {}
+                    },
+                    label = { Text(option.label) }
+                )
+            }
+        }
+
+        val selected = colors.firstOrNull { it.hex.equals(value, ignoreCase = true) }
+        Text(
+            "Selected: ${selected?.label ?: "Custom"}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (showCustom) {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onChange,
+                label = { Text("Custom HEX (advanced)") },
+                supportingText = { Text("Example: #111111") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ScenePicker(
+    scene: SceneType,
+    onChange: (SceneType) -> Unit
+) {
+    var category by remember(scene) {
+        mutableStateOf(SceneCatalog.categoryOf(scene))
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Environment", style = MaterialTheme.typography.labelMedium)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            contentPadding = PaddingValues(end = 12.dp)
+        ) {
+            items(SceneCategory.entries) { item ->
+                FilterChip(
+                    selected = item == category,
+                    onClick = { category = item },
+                    label = { Text(item.label) }
+                )
+            }
+        }
+
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            SceneCatalog.scenesIn(category).forEach { option ->
+                FilterChip(
+                    selected = option == scene,
+                    onClick = { onChange(option) },
+                    label = { Text(option.label) }
+                )
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SurfacePicker(
+    scene: SceneType,
+    surface: String,
+    pro: Boolean,
+    onChange: (String) -> Unit
+) {
+    val choices = SceneCatalog.surfacesFor(scene)
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Surface / interaction", style = MaterialTheme.typography.labelMedium)
+        Text(
+            "Suggestions match ${scene.label}. Changing environment automatically chooses a sensible first option.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        androidx.compose.foundation.layout.FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            choices.forEach { option ->
+                FilterChip(
+                    selected = option.prompt.equals(surface, ignoreCase = true),
+                    onClick = { onChange(option.prompt) },
+                    label = { Text(option.label) }
+                )
+            }
+        }
+
+        if (pro) {
+            OutlinedTextField(
+                value = surface,
+                onValueChange = onChange,
+                label = { Text("Custom surface / interaction") },
+                supportingText = { Text("Pro only. Presets are safer for scene consistency.") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
 }
 
 @Composable
