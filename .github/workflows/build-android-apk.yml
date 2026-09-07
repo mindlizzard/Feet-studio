@@ -1,0 +1,84 @@
+name: Build Feet Studio Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "App.tsx"
+      - "components/**"
+      - "services/**"
+      - "types.ts"
+      - "typesV4.ts"
+      - "constants.ts"
+      - "index.tsx"
+      - "index.html"
+      - "index.css"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.ts"
+      - ".github/workflows/build-android-apk.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: feet-studio-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install web dependencies
+        run: npm ci
+
+      - name: Build Feet Studio web app
+        run: npm run build
+
+      - name: Create Android project
+        run: |
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+
+      - name: Build installable APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Rename APK
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/debug/app-debug.apk release/Feet-Studio-v4-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Feet-Studio-v4-Android-APK
+          path: release/Feet-Studio-v4-debug.apk
+          if-no-files-found: error
+          retention-days: 30

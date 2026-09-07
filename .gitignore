@@ -26,3 +26,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# Android local build
+android/.gradle/
+android/local.properties
+release/
