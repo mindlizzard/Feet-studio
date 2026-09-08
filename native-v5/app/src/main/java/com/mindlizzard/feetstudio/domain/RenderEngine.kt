@@ -117,7 +117,6 @@ object RenderEngine {
         val fishnet = state.hosieryType == HosieryType.FISHNET
         val sockLike =
             state.hosieryType == HosieryType.ANKLE_SOCKS ||
-                state.hosieryType == HosieryType.KNEE_HIGH ||
                 state.hosieryType == HosieryType.TOE_SOCKS
 
         val opaque =
@@ -454,46 +453,8 @@ object RenderEngine {
             "Toenails are hidden. Do not hallucinate nail color through opaque hosiery or closed footwear."
         }
 
-        val hosiery = when {
-            !facts.wearingHosiery ->
-                "No hosiery. Bare skin is visible where footwear does not cover the feet."
-
-            facts.fishnet -> """
-                Fishnet hosiery, color ${ColorCatalog.describe(state.hosieryColor)},
-                pattern ${state.hosieryPattern.label},
-                ${state.meshSize.name.lowercase()} mesh,
-                thread thickness ${state.meshThickness}/100,
-                tension ${state.hosieryTension}/100,
-                compression ${state.hosieryCompression}/100,
-                wrinkles ${state.hosieryWrinkles}/100.
-
-                Open mesh remains open over toes, heel and sole.
-                Threads have physical thickness, stretch and tiny contact shadows.
-                Mesh direction follows the 3D curvature of thighs, knees, calves, ankles and feet.
-                Do not smear or paint mesh over joints.
-                ${if (state.wornKnit) "Fabric shows subtle realistic wear." else "Fabric is clean and intact."}
-            """.trimIndent()
-
-            else -> """
-                Hosiery: ${state.hosieryType.label}, ${state.denier.label},
-                pattern ${state.hosieryPattern.label},
-                color ${ColorCatalog.describe(state.hosieryColor)},
-                ${state.hosieryFinish.name.lowercase()} finish,
-                tension ${state.hosieryTension}/100,
-                compression ${state.hosieryCompression}/100,
-                wrinkles ${state.hosieryWrinkles}/100.
-
-                ${if (facts.opaqueHosiery)
-                    "Opaque layer: show fibers and folds; hide skin pores, veins and nail polish."
-                else
-                    "Sheer layer: skin and nail color are optically filtered through stretched fibers."
-                }
-
-                Fabric tension changes naturally around knees, ankles, toes and shoe openings.
-                No discontinuous fabric, random transparency holes or painted-on texture.
-                ${if (state.wornKnit) "Include subtle believable worn fabric texture." else ""}
-            """.trimIndent()
-        }
+        val hosiery =
+            RenderFidelityRules.hosieryMasterBlock(state, facts)
 
         val footwear = when {
             !facts.wearingShoes ->

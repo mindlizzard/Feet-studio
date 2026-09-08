@@ -47,7 +47,12 @@ class GeminiClient(
             .filter { it.enabled }
             .sortedBy { it.strength.ordinal }
             .take(5)
-            .forEach { ref ->
+            .forEachIndexed { index, ref ->
+                input.put(
+                    JSONObject()
+                        .put("type", "text")
+                        .put("text", buildReferenceGuide(index, ref))
+                )
                 uriToBase64(ref.uri)?.let { (mime, data) ->
                     input.put(
                         JSONObject()
@@ -104,6 +109,31 @@ class GeminiClient(
             return extractImage(raw)
                 ?: throw IllegalStateException("Gemini gaf geen afbeelding terug.")
         }
+    }
+
+    private fun buildReferenceGuide(index: Int, ref: ReferenceAsset): String {
+        val role = ref.role.name.lowercase()
+        val strength = ref.strength.name.uppercase()
+        val roleInstruction = when (role) {
+            "foot_shape" -> "Copy ONLY foot proportions, arch, heel and toe-order silhouette."
+            "skin" -> "Copy ONLY visible skin tone, undertone and texture character."
+            "nails" -> "Copy ONLY nail shape, color, polish placement and nail-art structure."
+            "hosiery" -> "Copy ONLY garment construction, denier appearance, transparency, seams, color and material behavior."
+            "footwear" -> "Copy ONLY shoe silhouette, upper/sole construction, straps, openings and material details."
+            "pose" -> "Copy ONLY articulation, limb ordering and weight distribution."
+            "camera" -> "Copy ONLY framing, viewpoint, focal-length feel and perspective."
+            "scene" -> "Copy ONLY environment, surface and spatial arrangement."
+            "style" -> "Copy ONLY photographic finish, grading and editorial mood."
+            else -> "Use ONLY the visual property assigned to this reference role."
+        }
+
+        return """
+            REFERENCE IMAGE ${index + 1}
+            ROLE: ${ref.role.name}
+            STRENGTH: $strength
+            $roleInstruction
+            Never import unrelated details from this reference.
+        """.trimIndent()
     }
 
     private fun extractImage(raw: String): ByteArray? {

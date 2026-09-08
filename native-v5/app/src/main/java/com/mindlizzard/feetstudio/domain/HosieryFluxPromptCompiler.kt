@@ -1,12 +1,10 @@
 package com.mindlizzard.feetstudio.domain
 
 object HosieryFluxPromptCompiler {
-    fun compile(
-        contract: RenderContract,
-        preset: HosieryLoraPreset
-    ): String {
+    fun compile(contract: RenderContract, preset: HosieryLoraPreset): String {
         val d = contract.effective
         val s = contract.settings
+        val facts = contract.facts
 
         val footwear = if (d.footwearType == FootwearType.NONE) {
             "no footwear"
@@ -14,35 +12,14 @@ object HosieryFluxPromptCompiler {
             "${d.footwearType.label}, ${d.footwearState.label}, ${ColorCatalog.describe(d.footwearColor)}"
         }
 
-        val hosiery = if (d.hosieryType == HosieryType.FISHNET) {
-            "${d.hosieryType.label}, ${d.meshSize.name.lowercase()} mesh, " +
-                "thread ${d.meshThickness}/100, tension ${d.hosieryTension}/100"
-        } else {
-            "${d.hosieryType.label}, ${d.denier.label}, ${d.hosieryPattern.label}, " +
-                "${d.hosieryFinish.name.lowercase()} finish, tension ${d.hosieryTension}/100, " +
-                "compression ${d.hosieryCompression}/100"
-        }
-
-        val layerRule = when {
-            d.hosieryType == HosieryType.NONE ->
-                "No hosiery layer. Do not invent nylon, seams or mesh."
-            d.hosieryType == HosieryType.FISHNET ->
-                "Open cells stay physically open; threads wrap around curvature and cast tiny contact shadows."
-            d.denier == Denier.D60 || d.denier == Denier.D100 ->
-                "Opaque fabric hides pores and nail polish beneath it."
-            else ->
-                "Sheer fabric filters skin/nail color through real fibers; stretched regions change transparency gradually."
-        }
+        val hosiery = RenderFidelityRules.hosieryMasterBlock(d, facts)
 
         return """
             Photorealistic adult fashion editorial photograph. One coherent adult subject, age ${d.modelAge}.
-            ${preset.triggerWord}. Primary material study: $hosiery, color ${ColorCatalog.describe(d.hosieryColor)}.
+            ${preset.triggerWord}.
 
-            HOSIERY PHYSICS:
-            Real nylon/fiber structure, weave direction, stretch, compression, tiny wrinkles,
-            contact shadows and natural highlight roll-off. Fabric wraps continuously around
-            thighs, knees, calves, ankles, heels, toes and soles according to the garment.
-            $layerRule No painted-on texture, random transparency holes or broken fabric continuity.
+            HOSIERY MASTER:
+            $hosiery
 
             LAYER ORDER:
             skin -> hosiery -> footwear where present. Footwear: $footwear.
@@ -70,6 +47,6 @@ object HosieryFluxPromptCompiler {
             believable skin texture, clean shoe seams, real contact shadows, optical depth falloff.
             No waxy smoothing, fake HDR, sharpening halos, watercolor blur, CGI sheen,
             duplicated limbs, extra toes, text or watermark.
-        """.trimIndent().take(2950)
+        """.trimIndent().take(3200)
     }
 }
