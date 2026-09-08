@@ -238,6 +238,7 @@ data class DesignState(
     val pose: PoseType = PoseType.STANDING,
     val customPose: String = "",
     val cameraAngle: CameraAngle = CameraAngle.LOW,
+    val cameraAzimuth: Int = 0,
     val lens: Lens = Lens.MM85,
     val cameraDistance: Int = 50,
     val cameraHeight: Int = 35,

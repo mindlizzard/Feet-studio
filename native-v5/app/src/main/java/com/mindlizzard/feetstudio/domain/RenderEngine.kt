@@ -81,6 +81,7 @@ object RenderEngine {
             hosieryCompression = state.hosieryCompression.coerceIn(0, 100),
             hosieryWrinkles = state.hosieryWrinkles.coerceIn(0, 100),
             meshThickness = state.meshThickness.coerceIn(0, 100),
+            cameraAzimuth = ((state.cameraAzimuth % 360) + 360) % 360,
             cameraDistance = state.cameraDistance.coerceIn(0, 100),
             cameraHeight = state.cameraHeight.coerceIn(0, 100),
             cameraTilt = state.cameraTilt.coerceIn(-45, 45),
@@ -332,6 +333,16 @@ object RenderEngine {
         return effective to decisions
     }
 
+    private fun azimuthLabel(degrees: Int): String {
+        val d = ((degrees % 360) + 360) % 360
+        return when {
+            d < 45 || d >= 315 -> "front"
+            d < 135 -> "subject-right side"
+            d < 225 -> "rear"
+            else -> "subject-left side"
+        }
+    }
+
     private fun compilePrompt(
         state: DesignState,
         settings: StudioSettings,
@@ -486,6 +497,8 @@ object RenderEngine {
         val camera = buildString {
             append(
                 "${state.cameraAngle.label}, ${state.lens.label}. " +
+                    "3D camera orbit azimuth ${state.cameraAzimuth}° (${azimuthLabel(state.cameraAzimuth)}). " +
+                    "Use numeric orbit for exact front/side/rear placement and angle preset as framing intent. " +
                     "Distance ${state.cameraDistance}/100, height ${state.cameraHeight}/100, " +
                     "tilt ${state.cameraTilt}°, roll ${state.cameraRoll}°, " +
                     "depth of field ${state.depthOfField}/100."

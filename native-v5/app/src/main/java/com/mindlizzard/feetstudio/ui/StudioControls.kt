@@ -81,7 +81,17 @@ private fun shuffleSection(section: StudioSection, vm: StudioViewModel, workspac
             it.copy(hosieryType = HosieryType.entries.random(), denier = Denier.entries.random(), hosieryPattern = HosieryPattern.entries.random(), hosieryFinish = HosieryFinish.entries.random())
         }
         StudioSection.POSE -> if (!s.lockPose) vm.updateDesign { it.copy(pose = SceneCatalog.recommendedPoses(d.scene).random(), customPose = "") }
-        StudioSection.CAMERA -> if (!s.lockCamera) vm.updateDesign { it.copy(cameraAngle = CameraAngle.entries.random(), lens = Lens.entries.random(), customCamera = "") }
+        StudioSection.CAMERA -> if (!s.lockCamera) {
+            val angle = CameraAngle.entries.random()
+            vm.updateDesign {
+                it.copy(
+                    cameraAngle = angle,
+                    cameraAzimuth = azimuthForCameraAngle(angle),
+                    lens = Lens.entries.random(),
+                    customCamera = ""
+                )
+            }
+        }
         StudioSection.SCENE -> if (!s.lockScene) {
             val scene = SceneType.entries.random()
             vm.updateDesign { it.copy(scene = scene, surface = SceneCatalog.defaultSurface(scene), customPose = "", customCamera = "") }
@@ -193,12 +203,32 @@ private fun androidx.compose.foundation.lazy.LazyListScope.poseItems(vm: StudioV
 private fun androidx.compose.foundation.lazy.LazyListScope.cameraItems(vm: StudioViewModel, workspace: WorkspaceState) {
     val d = workspace.design
     val pro = workspace.settings.mode == StudioMode.PRO
-    item { EnumChips("Angle", CameraAngle.entries, d.cameraAngle, { it.label }) { v -> vm.updateDesign { it.copy(cameraAngle = v, customCamera = "") } } }
+
+    item {
+        EnumChips("Angle", CameraAngle.entries, d.cameraAngle, { it.label }) { v ->
+            vm.updateDesign {
+                it.copy(
+                    cameraAngle = v,
+                    cameraAzimuth = azimuthForCameraAngle(v),
+                    customCamera = ""
+                )
+            }
+        }
+    }
     item { EnumChips("Lens", Lens.entries, d.lens, { it.label }) { v -> vm.updateDesign { it.copy(lens = v) } } }
     item { EnumChips("Aspect ratio", AspectRatio.entries, workspace.settings.aspectRatio, { it.apiValue }) { v -> vm.updateSettings { it.copy(aspectRatio = v) } } }
+
+    item {
+        Camera3DVisualizer(
+            state = d,
+            onChange = { next -> vm.updateDesign { next } }
+        )
+    }
+
     if (pro) {
         item { IntSlider("Distance", d.cameraDistance) { v -> vm.updateDesign { it.copy(cameraDistance = v) } } }
         item { IntSlider("Height", d.cameraHeight) { v -> vm.updateDesign { it.copy(cameraHeight = v) } } }
+        item { IntSlider("Azimuth", d.cameraAzimuth, 0, 359) { v -> vm.updateDesign { it.copy(cameraAzimuth = v) } } }
         item { IntSlider("Tilt", d.cameraTilt, -45, 45) { v -> vm.updateDesign { it.copy(cameraTilt = v) } } }
         item { IntSlider("Roll", d.cameraRoll, -45, 45) { v -> vm.updateDesign { it.copy(cameraRoll = v) } } }
         item { IntSlider("Depth of field", d.depthOfField) { v -> vm.updateDesign { it.copy(depthOfField = v) } } }

@@ -44,6 +44,7 @@ object HosieryFluxPromptCompiler {
 
             Pose: ${d.pose.label}.
             Camera: ${d.cameraAngle.label}, ${d.lens.label},
+            orbit azimuth ${d.cameraAzimuth} degrees around the subject,
             distance ${d.cameraDistance}/100, height ${d.cameraHeight}/100,
             tilt ${d.cameraTilt} degrees, roll ${d.cameraRoll} degrees.
             Scene: ${d.scene.label}. Surface/contact: ${d.surface}.
