@@ -24,12 +24,14 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.mindlizzard.feetstudio.domain.CameraAngle
 import com.mindlizzard.feetstudio.domain.DesignState
 import com.mindlizzard.feetstudio.domain.Lens
 import com.mindlizzard.feetstudio.domain.PoseType
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
@@ -39,10 +41,8 @@ import kotlin.math.sqrt
 
 fun azimuthForCameraAngle(angle: CameraAngle): Int =
     when (angle) {
-        CameraAngle.SIDE,
-        CameraAngle.LYING_SIDE -> 90
-        CameraAngle.REAR_VIEW,
-        CameraAngle.OVER_SHOULDER -> 180
+        CameraAngle.SIDE, CameraAngle.LYING_SIDE -> 90
+        CameraAngle.REAR_VIEW, CameraAngle.OVER_SHOULDER -> 180
         else -> 0
     }
 
@@ -52,198 +52,239 @@ fun Camera3DVisualizer(
     onChange: (DesignState) -> Unit
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surfaceVariant
-    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.30f)
+    val gridColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+    val orbitColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.42f)
     val subjectColor = MaterialTheme.colorScheme.onSurface
     val cameraColor = MaterialTheme.colorScheme.primary
     val rayColor = MaterialTheme.colorScheme.secondary
-    val scroll = rememberScrollState()
+    val focusColor = MaterialTheme.colorScheme.tertiary
+    val presetScroll = rememberScrollState()
+    val focusScroll = rememberScrollState()
 
     val complexPose = state.pose in setOf(
-        PoseType.CROSSED,
-        PoseType.LOTUS,
-        PoseType.DRIVING,
-        PoseType.ACTION_PEDAL,
-        PoseType.DASHBOARD,
-        PoseType.RECLINED,
-        PoseType.WALL_LEGS,
-        PoseType.KNEELING,
-        PoseType.PINUP_KNEEL,
-        PoseType.PINUP_CROSS,
-        PoseType.PINUP_RECLINE
+        PoseType.CROSSED, PoseType.LOTUS, PoseType.DRIVING,
+        PoseType.ACTION_PEDAL, PoseType.DASHBOARD, PoseType.RECLINED,
+        PoseType.WALL_LEGS, PoseType.KNEELING, PoseType.PINUP_KNEEL,
+        PoseType.PINUP_CROSS, PoseType.PINUP_RECLINE
     )
     val wideLens = state.lens == Lens.MM16 || state.lens == Lens.MM24
-    val risky = state.cameraDistance < 45 && (complexPose || wideLens)
+    val criticalRisk = state.cameraDistance < 34 && (complexPose || wideLens)
+    val warningRisk = !criticalRisk && (
+        state.cameraDistance < 46 && (complexPose || wideLens) ||
+            abs(state.cameraTilt) > 32 ||
+            (wideLens && state.cameraDistance < 56)
+    )
 
     Card(Modifier.fillMaxWidth()) {
         Column(
-            Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            Text("Camera 3D View", style = MaterialTheme.typography.titleMedium)
+            Text("Camera Studio", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Sleep de camera rond het model. Verder van het midden = grotere afstand. De positie wordt direct toegepast.",
+                "Sleep de camera over de orbit-ring. Pak het vizier om het focuspunt te verplaatsen.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Surface(
-                modifier = Modifier.fillMaxWidth().height(300.dp),
-                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth().height(360.dp),
+                shape = RoundedCornerShape(18.dp),
                 color = surfaceColor
             ) {
                 Canvas(
                     Modifier
                         .fillMaxSize()
-                        .pointerInput(state.cameraHeight, state.cameraAzimuth, state.cameraDistance) {
-                            detectDragGestures { change, _ ->
+                        .pointerInput(
+                            state.cameraHeight,
+                            state.cameraAzimuth,
+                            state.cameraDistance,
+                            state.cameraFocusY
+                        ) {
+                            var draggingFocus = false
+                            detectDragGestures(
+                                onDragStart = { start ->
+                                    val target = focusPoint(
+                                        size.width.toFloat(),
+                                        size.height.toFloat(),
+                                        state.cameraFocusY
+                                    )
+                                    draggingFocus = pointDistance(start, target) < 58f
+                                },
+                                onDragEnd = { draggingFocus = false },
+                                onDragCancel = { draggingFocus = false }
+                            ) { change, _ ->
                                 change.consume()
                                 val w = size.width.toFloat()
                                 val h = size.height.toFloat()
-                                val center = orbitCenter(w, h)
-                                val shift = heightShift(h, state.cameraHeight)
-                                val dx = change.position.x - center.x
-                                val dz = (change.position.y + shift - center.y) / 0.42f
 
-                                var azimuth = Math.toDegrees(
-                                    atan2(dx.toDouble(), dz.toDouble())
-                                ).roundToInt()
-                                if (azimuth < 0) azimuth += 360
-
-                                val maxRadius = min(w, h) * 0.44f
-                                val radius = sqrt(dx * dx + dz * dz)
-                                val distance = (
-                                    ((radius / maxRadius - 0.28f) / 0.72f) * 100f
-                                ).roundToInt().coerceIn(0, 100)
-
-                                onChange(
-                                    state.copy(
-                                        cameraAzimuth = azimuth % 360,
-                                        cameraDistance = distance,
-                                        customCamera = ""
+                                if (draggingFocus) {
+                                    onChange(
+                                        state.copy(
+                                            cameraFocusY = focusYFromScreen(change.position.y, h),
+                                            customCamera = ""
+                                        )
                                     )
-                                )
+                                } else {
+                                    val center = orbitCenter(w, h)
+                                    val shift = heightShift(h, state.cameraHeight)
+                                    val dx = change.position.x - center.x
+                                    val dz = (change.position.y + shift - center.y) / 0.42f
+
+                                    var azimuth = Math.toDegrees(
+                                        atan2(dx.toDouble(), dz.toDouble())
+                                    ).roundToInt()
+                                    if (azimuth < 0) azimuth += 360
+
+                                    val maxRadius = min(w, h) * 0.46f
+                                    val radius = sqrt(dx * dx + dz * dz)
+                                    val distance = (
+                                        ((radius / maxRadius - 0.30f) / 0.70f) * 100f
+                                    ).roundToInt().coerceIn(0, 100)
+
+                                    onChange(
+                                        state.copy(
+                                            cameraAzimuth = azimuth % 360,
+                                            cameraDistance = distance,
+                                            customCamera = ""
+                                        )
+                                    )
+                                }
                             }
                         }
                 ) {
                     val w = size.width
                     val h = size.height
                     val cx = w / 2f
-                    val horizon = h * 0.28f
-                    val floor = h * 0.82f
+                    val horizon = h * 0.24f
+                    val floor = h * 0.87f
 
-                    for (i in 0..8) {
-                        drawLine(
-                            gridColor,
-                            Offset(cx, horizon),
-                            Offset(w * i / 8f, h),
-                            strokeWidth = 1.2f
-                        )
-                    }
-                    for (i in 1..6) {
-                        val t = i / 6f
-                        val y = horizon + t * t * (h - horizon)
-                        drawLine(
-                            gridColor,
-                            Offset(0f, y),
-                            Offset(w, y),
-                            strokeWidth = 1.2f
-                        )
-                    }
+                    drawStudioGrid(w, h, horizon, cx, gridColor)
+                    drawOrbitRing(w, h, orbitColor)
+                    drawRotatingSubject(cx, floor, h, state.cameraAzimuth, subjectColor)
 
-                    drawSubject(cx, floor, h, subjectColor)
+                    val target = focusPoint(w, h, state.cameraFocusY)
+                    drawFocusTarget(target, focusColor)
 
-                    val camera = cameraPoint(
+                    val cameraPoint = cameraPoint(
                         w, h, state.cameraAzimuth, state.cameraDistance, state.cameraHeight
                     )
                     val cameraFloor = cameraPoint(
                         w, h, state.cameraAzimuth, state.cameraDistance, 50
                     )
-                    val target = Offset(cx, h * 0.52f)
 
-                    drawLine(gridColor, cameraFloor, camera, strokeWidth = 2f)
-                    drawLine(rayColor.copy(alpha = 0.72f), camera, target, strokeWidth = 3f)
+                    drawHeightRail(
+                        w, h, state.cameraHeight, orbitColor, cameraColor
+                    )
+                    drawLine(orbitColor, cameraFloor, cameraPoint, strokeWidth = 2f)
+                    drawLine(
+                        rayColor.copy(alpha = 0.82f),
+                        cameraPoint,
+                        target,
+                        strokeWidth = 3.2f
+                    )
 
                     val half = lensTargetWidth(state.lens)
                     drawLine(
-                        rayColor.copy(alpha = 0.35f),
-                        camera,
+                        rayColor.copy(alpha = 0.34f),
+                        cameraPoint,
                         target + Offset(-half, 0f),
                         strokeWidth = 2f
                     )
                     drawLine(
-                        rayColor.copy(alpha = 0.35f),
-                        camera,
+                        rayColor.copy(alpha = 0.34f),
+                        cameraPoint,
                         target + Offset(half, 0f),
                         strokeWidth = 2f
                     )
-
-                    drawCameraGlyph(camera, cameraColor)
+                    drawCameraGlyph(cameraPoint, cameraColor)
                 }
             }
 
             Text(
-                "Azimuth ${state.cameraAzimuth}° · afstand ${state.cameraDistance} · hoogte ${state.cameraHeight} · ${state.lens.label}",
+                "Azimuth ${state.cameraAzimuth}° · ${distanceLabel(state.cameraDistance)} · " +
+                    "hoogte ${state.cameraHeight} · focus ${focusLabel(state.cameraFocusY)} · ${state.lens.label}",
                 style = MaterialTheme.typography.labelMedium
             )
 
             Row(
-                Modifier.fillMaxWidth().horizontalScroll(scroll),
+                Modifier.fillMaxWidth().horizontalScroll(presetScroll),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Preset("Front") {
                     onChange(state.copy(
                         cameraAngle = CameraAngle.FULL_BODY,
-                        cameraAzimuth = 0,
-                        cameraDistance = 64,
-                        cameraHeight = 48,
-                        cameraTilt = 0,
-                        lens = Lens.MM50,
+                        cameraAzimuth = 0, cameraDistance = 64, cameraHeight = 48,
+                        cameraFocusY = 48, cameraTilt = 0, lens = Lens.MM50,
                         customCamera = ""
                     ))
                 }
-                Preset("Low feet") {
+                Preset("¾ left") {
                     onChange(state.copy(
-                        cameraAngle = CameraAngle.LOW,
-                        cameraAzimuth = 0,
-                        cameraDistance = 42,
-                        cameraHeight = 14,
-                        cameraTilt = 10,
-                        lens = Lens.MM50,
+                        cameraAngle = CameraAngle.FULL_BODY,
+                        cameraAzimuth = 315, cameraDistance = 62, cameraHeight = 48,
+                        cameraFocusY = 48, cameraTilt = 0, lens = Lens.MM50,
                         customCamera = ""
                     ))
                 }
                 Preset("Side") {
                     onChange(state.copy(
                         cameraAngle = CameraAngle.SIDE,
-                        cameraAzimuth = 90,
-                        cameraDistance = 62,
-                        cameraHeight = 46,
-                        cameraTilt = 0,
-                        lens = Lens.MM50,
+                        cameraAzimuth = 90, cameraDistance = 62, cameraHeight = 46,
+                        cameraFocusY = 50, cameraTilt = 0, lens = Lens.MM50,
                         customCamera = ""
                     ))
                 }
                 Preset("Rear") {
                     onChange(state.copy(
                         cameraAngle = CameraAngle.REAR_VIEW,
-                        cameraAzimuth = 180,
-                        cameraDistance = 64,
-                        cameraHeight = 46,
-                        cameraTilt = 0,
-                        lens = Lens.MM50,
+                        cameraAzimuth = 180, cameraDistance = 64, cameraHeight = 46,
+                        cameraFocusY = 48, cameraTilt = 0, lens = Lens.MM50,
+                        customCamera = ""
+                    ))
+                }
+                Preset("Ground") {
+                    onChange(state.copy(
+                        cameraAngle = CameraAngle.LOW,
+                        cameraAzimuth = 0, cameraDistance = 48, cameraHeight = 6,
+                        cameraFocusY = 78, cameraTilt = 12, lens = Lens.MM50,
+                        customCamera = ""
+                    ))
+                }
+                Preset("Feet macro") {
+                    onChange(state.copy(
+                        cameraAngle = CameraAngle.MACRO_TOES,
+                        cameraAzimuth = 0, cameraDistance = 24, cameraHeight = 10,
+                        cameraFocusY = 94, cameraTilt = 8, lens = Lens.MACRO,
                         customCamera = ""
                     ))
                 }
                 Preset("Top") {
                     onChange(state.copy(
                         cameraAngle = CameraAngle.TOP,
-                        cameraAzimuth = 0,
-                        cameraDistance = 60,
-                        cameraHeight = 90,
-                        cameraTilt = -32,
-                        lens = Lens.MM50,
+                        cameraAzimuth = 0, cameraDistance = 62, cameraHeight = 92,
+                        cameraFocusY = 50, cameraTilt = -34, lens = Lens.MM50,
                         customCamera = ""
                     ))
+                }
+            }
+
+            Text("Focus target", style = MaterialTheme.typography.labelMedium)
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(focusScroll),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FocusChip("Head", state.cameraFocusY <= 24) {
+                    onChange(state.copy(cameraFocusY = 15))
+                }
+                FocusChip("Torso", state.cameraFocusY in 25..52) {
+                    onChange(state.copy(cameraFocusY = 42))
+                }
+                FocusChip("Legs", state.cameraFocusY in 53..78) {
+                    onChange(state.copy(cameraFocusY = 68))
+                }
+                FocusChip("Feet", state.cameraFocusY >= 79) {
+                    onChange(state.copy(cameraFocusY = 94))
                 }
             }
 
@@ -265,19 +306,23 @@ fun Camera3DVisualizer(
                 valueRange = -45f..45f
             )
 
-            if (risky) {
-                Text(
-                    "⚠ Deze camera staat erg dicht op het model. Bij een complexe pose of 16/24mm lens kan anatomie sneller vervormen.",
+            when {
+                criticalRisk -> Text(
+                    "🔴 Hoog anatomierisico: camera erg dichtbij met complexe pose of groothoek.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
+                warningRisk -> Text(
+                    "🟡 Perspectiefwaarschuwing: deze combinatie kan benen/voeten sterker vervormen.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+                else -> Text(
+                    "🟢 Camerageometrie is rustig. Goede basis voor stabiele anatomie.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
-
-            Text(
-                "3D azimuth bepaalt de exacte front/side/rear positie. Angle blijft de framingstijl.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -287,10 +332,48 @@ private fun Preset(label: String, onClick: () -> Unit) {
     AssistChip(onClick = onClick, label = { Text(label) })
 }
 
-private fun orbitCenter(w: Float, h: Float) = Offset(w / 2f, h * 0.62f)
+@Composable
+private fun FocusChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(if (selected) "● $label" else label) }
+    )
+}
+
+private fun pointDistance(a: Offset, b: Offset): Float {
+    val dx = a.x - b.x
+    val dy = a.y - b.y
+    return sqrt(dx * dx + dy * dy)
+}
+
+private fun focusYFromScreen(y: Float, h: Float): Int =
+    (((y - h * 0.20f) / (h * 0.70f)) * 100f)
+        .roundToInt().coerceIn(0, 100)
+
+private fun focusPoint(w: Float, h: Float, focusY: Int): Offset =
+    Offset(
+        w / 2f,
+        h * 0.20f + h * 0.70f * focusY.coerceIn(0, 100) / 100f
+    )
+
+private fun focusLabel(focusY: Int): String = when {
+    focusY <= 24 -> "hoofd"
+    focusY <= 52 -> "torso"
+    focusY <= 78 -> "benen"
+    else -> "voeten"
+}
+
+private fun distanceLabel(value: Int): String = when {
+    value < 28 -> "Macro/close"
+    value < 48 -> "Close"
+    value < 70 -> "Medium"
+    else -> "Full body"
+}
+
+private fun orbitCenter(w: Float, h: Float) = Offset(w / 2f, h * 0.64f)
 
 private fun heightShift(h: Float, cameraHeight: Int): Float =
-    (cameraHeight - 50) / 100f * h * 0.22f
+    (cameraHeight - 50) / 100f * h * 0.24f
 
 private fun cameraPoint(
     w: Float,
@@ -300,8 +383,10 @@ private fun cameraPoint(
     cameraHeight: Int
 ): Offset {
     val center = orbitCenter(w, h)
-    val maxRadius = min(w, h) * 0.44f
-    val radius = maxRadius * (0.28f + distance.coerceIn(0, 100) / 100f * 0.72f)
+    val maxRadius = min(w, h) * 0.46f
+    val radius = maxRadius * (
+        0.30f + distance.coerceIn(0, 100) / 100f * 0.70f
+    )
     val radians = Math.toRadians(azimuth.toDouble())
     val x = center.x + sin(radians).toFloat() * radius
     val z = cos(radians).toFloat() * radius
@@ -310,64 +395,152 @@ private fun cameraPoint(
 }
 
 private fun lensTargetWidth(lens: Lens): Float = when (lens) {
-    Lens.MM16 -> 78f
-    Lens.MM24 -> 65f
-    Lens.MM35 -> 52f
-    Lens.MM50 -> 42f
-    Lens.MM85 -> 32f
-    Lens.MM105 -> 26f
+    Lens.MM16 -> 98f
+    Lens.MM24 -> 82f
+    Lens.MM35 -> 64f
+    Lens.MM50 -> 50f
+    Lens.MM85 -> 36f
+    Lens.MM105 -> 29f
     Lens.MACRO -> 22f
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSubject(
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawStudioGrid(
+    w: Float, h: Float, horizon: Float, centerX: Float, color: Color
+) {
+    for (i in 0..10) {
+        drawLine(
+            color,
+            Offset(centerX, horizon),
+            Offset(w * i / 10f, h),
+            strokeWidth = 1f
+        )
+    }
+    for (i in 1..7) {
+        val t = i / 7f
+        val y = horizon + t * t * (h - horizon)
+        drawLine(color, Offset(0f, y), Offset(w, y), strokeWidth = 1f)
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOrbitRing(
+    w: Float, h: Float, color: Color
+) {
+    val width = min(w * 0.86f, h * 0.78f)
+    drawOval(
+        color = color,
+        topLeft = Offset(w / 2f - width / 2f, h * 0.49f),
+        size = Size(width, width * 0.34f),
+        style = Stroke(width = 2f)
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawHeightRail(
+    w: Float, h: Float, cameraHeight: Int, color: Color, accent: Color
+) {
+    val x = w - 28f
+    val top = h * 0.18f
+    val bottom = h * 0.88f
+    drawLine(color, Offset(x, top), Offset(x, bottom), strokeWidth = 3f)
+    val y = bottom - (bottom - top) * cameraHeight.coerceIn(0, 100) / 100f
+    drawCircle(accent, radius = 8f, center = Offset(x, y))
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawFocusTarget(
+    center: Offset, color: Color
+) {
+    drawCircle(color.copy(alpha = 0.20f), radius = 24f, center = center)
+    drawCircle(color, radius = 8f, center = center, style = Stroke(width = 3f))
+    drawLine(
+        color,
+        center + Offset(-18f, 0f),
+        center + Offset(18f, 0f),
+        strokeWidth = 2.5f
+    )
+    drawLine(
+        color,
+        center + Offset(0f, -18f),
+        center + Offset(0f, 18f),
+        strokeWidth = 2.5f
+    )
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawRotatingSubject(
     centerX: Float,
     floorY: Float,
     height: Float,
+    azimuth: Int,
     color: Color
 ) {
-    val head = Offset(centerX, floorY - height * 0.36f)
-    val neck = Offset(centerX, floorY - height * 0.30f)
-    val pelvis = Offset(centerX, floorY - height * 0.15f)
-    val leftKnee = Offset(centerX - height * 0.04f, floorY - height * 0.075f)
-    val rightKnee = Offset(centerX + height * 0.04f, floorY - height * 0.075f)
-    val leftFoot = Offset(centerX - height * 0.06f, floorY)
-    val rightFoot = Offset(centerX + height * 0.06f, floorY)
+    val radians = Math.toRadians(azimuth.toDouble())
+    val frontFactor = abs(cos(radians)).toFloat()
+    val sideFactor = abs(sin(radians)).toFloat()
+    val bodyScale = 0.42f + frontFactor * 0.58f
+    val depthShift = sin(radians).toFloat() * height * 0.018f
 
-    drawCircle(color, radius = height * 0.028f, center = head)
-    drawLine(color, neck, pelvis, strokeWidth = 6f)
+    val head = Offset(centerX + depthShift * 0.25f, floorY - height * 0.53f)
+    val shoulderY = floorY - height * 0.43f
+    val pelvisY = floorY - height * 0.25f
+    val kneeY = floorY - height * 0.115f
+    val shoulderHalf = height * 0.075f * bodyScale
+    val hipHalf = height * 0.045f * bodyScale
+    val legHalf = height * (0.045f * bodyScale + 0.010f * sideFactor)
+    val neck = Offset(centerX + depthShift * 0.2f, floorY - height * 0.46f)
+    val pelvis = Offset(centerX, pelvisY)
+    val leftKnee = Offset(centerX - legHalf + depthShift, kneeY)
+    val rightKnee = Offset(centerX + legHalf - depthShift, kneeY)
+    val leftFoot = Offset(centerX - legHalf * 1.25f + depthShift * 1.2f, floorY)
+    val rightFoot = Offset(centerX + legHalf * 1.25f - depthShift * 1.2f, floorY)
+
+    drawCircle(color, radius = height * 0.038f, center = head)
+    drawLine(color, neck, pelvis, strokeWidth = 8f)
     drawLine(
         color,
-        Offset(centerX - height * 0.055f, neck.y + height * 0.035f),
-        Offset(centerX + height * 0.055f, neck.y + height * 0.035f),
-        strokeWidth = 5f
+        Offset(centerX - shoulderHalf, shoulderY),
+        Offset(centerX + shoulderHalf, shoulderY + depthShift * 0.30f),
+        strokeWidth = 7f
     )
-    drawLine(color, pelvis, leftKnee, strokeWidth = 6f)
-    drawLine(color, leftKnee, leftFoot, strokeWidth = 6f)
-    drawLine(color, pelvis, rightKnee, strokeWidth = 6f)
-    drawLine(color, rightKnee, rightFoot, strokeWidth = 6f)
-    drawLine(color, leftFoot, leftFoot + Offset(height * 0.035f, 0f), strokeWidth = 5f)
-    drawLine(color, rightFoot, rightFoot + Offset(height * 0.035f, 0f), strokeWidth = 5f)
+    drawLine(
+        color,
+        Offset(centerX - hipHalf, pelvisY),
+        Offset(centerX + hipHalf, pelvisY + depthShift * 0.18f),
+        strokeWidth = 7f
+    )
+    drawLine(color, pelvis, leftKnee, strokeWidth = 8f)
+    drawLine(color, leftKnee, leftFoot, strokeWidth = 8f)
+    drawLine(color, pelvis, rightKnee, strokeWidth = 8f)
+    drawLine(color, rightKnee, rightFoot, strokeWidth = 8f)
+    drawLine(
+        color,
+        leftFoot,
+        leftFoot + Offset(height * 0.050f, 0f),
+        strokeWidth = 7f
+    )
+    drawLine(
+        color,
+        rightFoot,
+        rightFoot + Offset(height * 0.050f, 0f),
+        strokeWidth = 7f
+    )
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCameraGlyph(
-    center: Offset,
-    color: Color
+    center: Offset, color: Color
 ) {
     drawRoundRect(
         color = color,
-        topLeft = Offset(center.x - 18f, center.y - 12f),
-        size = Size(36f, 24f),
-        cornerRadius = CornerRadius(5f, 5f)
+        topLeft = Offset(center.x - 20f, center.y - 14f),
+        size = Size(40f, 28f),
+        cornerRadius = CornerRadius(6f, 6f)
     )
     drawCircle(
-        color = Color.White.copy(alpha = 0.92f),
-        radius = 6f,
+        color = Color.White.copy(alpha = 0.94f),
+        radius = 7f,
         center = center
     )
     drawRoundRect(
         color = color,
-        topLeft = Offset(center.x - 8f, center.y - 18f),
-        size = Size(16f, 7f),
+        topLeft = Offset(center.x - 9f, center.y - 21f),
+        size = Size(18f, 8f),
         cornerRadius = CornerRadius(3f, 3f)
     )
 }

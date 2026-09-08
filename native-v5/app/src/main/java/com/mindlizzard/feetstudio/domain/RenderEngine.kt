@@ -82,6 +82,7 @@ object RenderEngine {
             hosieryWrinkles = state.hosieryWrinkles.coerceIn(0, 100),
             meshThickness = state.meshThickness.coerceIn(0, 100),
             cameraAzimuth = ((state.cameraAzimuth % 360) + 360) % 360,
+            cameraFocusY = state.cameraFocusY.coerceIn(0, 100),
             cameraDistance = state.cameraDistance.coerceIn(0, 100),
             cameraHeight = state.cameraHeight.coerceIn(0, 100),
             cameraTilt = state.cameraTilt.coerceIn(-45, 45),
@@ -343,6 +344,14 @@ object RenderEngine {
         }
     }
 
+    private fun focusLabel(value: Int): String =
+        when {
+            value <= 24 -> "head / face"
+            value <= 52 -> "torso / hips"
+            value <= 78 -> "legs / knees"
+            else -> "feet / footwear"
+        }
+
     private fun compilePrompt(
         state: DesignState,
         settings: StudioSettings,
@@ -499,6 +508,8 @@ object RenderEngine {
                 "${state.cameraAngle.label}, ${state.lens.label}. " +
                     "3D camera orbit azimuth ${state.cameraAzimuth}° (${azimuthLabel(state.cameraAzimuth)}). " +
                     "Use numeric orbit for exact front/side/rear placement and angle preset as framing intent. " +
+                    "Vertical focus target ${state.cameraFocusY}/100 (${focusLabel(state.cameraFocusY)}). " +
+                    "Compose and focus around that target without disconnecting body anatomy. " +
                     "Distance ${state.cameraDistance}/100, height ${state.cameraHeight}/100, " +
                     "tilt ${state.cameraTilt}°, roll ${state.cameraRoll}°, " +
                     "depth of field ${state.depthOfField}/100."
