@@ -14,8 +14,8 @@ android {
         applicationId = "com.mindlizzard.feetstudio.v5"
         minSdk = 29
         targetSdk = 35
-        versionCode = 507200 + ciRunNumber
-        versionName = if (ciRunNumber > 0) "5.7.2.$ciRunNumber" else "5.7.2"
+        versionCode = 507300 + ciRunNumber
+        versionName = if (ciRunNumber > 0) "5.7.3.$ciRunNumber" else "5.7.3"
 
         vectorDrawables {
             useSupportLibrary = true

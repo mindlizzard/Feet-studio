@@ -11,6 +11,7 @@ import com.mindlizzard.feetstudio.data.GalleryRepository
 import com.mindlizzard.feetstudio.data.HuggingFaceKeyStore
 import com.mindlizzard.feetstudio.data.MuapiKeyStore
 import com.mindlizzard.feetstudio.data.SecureKeyStore
+import com.mindlizzard.feetstudio.domain.BodyTopologyRules
 import com.mindlizzard.feetstudio.domain.DesignState
 import com.mindlizzard.feetstudio.domain.FixTarget
 import com.mindlizzard.feetstudio.domain.ImageEngine
@@ -389,7 +390,11 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         REFINE THIS SAME IMAGE. DO NOT REDESIGN IT.
 
         First repair structural realism if needed:
-        - both legs must trace continuously from pelvis through knees and ankles into the feet
+        - enforce exactly ONE pelvis and exactly TWO hip joints
+        - left hip -> left thigh -> left knee -> left shin/calf -> left ankle -> left foot
+        - right hip -> right thigh -> right knee -> right shin/calf -> right ankle -> right foot
+        - crossing limbs may overlap visually but hidden segments remain continuous behind the foreground limb
+        - remove any second pelvis, duplicate hip/buttock mass, extra thigh or repeated lower torso
         - preserve natural limb lengths and left/right orientation
         - preserve exactly one coherent shoe per intended foot
         - correct warped toe boxes, heels, straps, soles or footwear rotation
@@ -433,7 +438,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         val instruction = when (target) {
             FixTarget.ANATOMY -> """
                 Repair structural anatomy only.
-                Trace each leg from pelvis -> hip -> knee -> shin/calf -> ankle -> heel -> foot.
+                ${BodyTopologyRules.repairInstruction()}
                 Correct impossible crossing, disconnected joints, twisted shins, ankle rotation,
                 toe count and foot proportions.
                 Preserve styling, scene and lighting.
@@ -460,7 +465,9 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
             FixTarget.POSE -> """
                 Correct only physically implausible body/leg/foot pose.
-                Preserve pose intent but restore plausible pelvis, knee and ankle articulation.
+                ${BodyTopologyRules.repairInstruction()}
+                Preserve pose intent but restore plausible pelvis, hip, knee and ankle articulation.
+                Keep one torso and one pelvis even when legs cross or overlap strongly.
             """.trimIndent()
 
             FixTarget.REFERENCE -> """

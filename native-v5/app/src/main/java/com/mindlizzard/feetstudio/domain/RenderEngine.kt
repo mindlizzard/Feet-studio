@@ -295,11 +295,14 @@ object RenderEngine {
                             "A complex pose with extreme perspective was changed to a safer 50mm full-body framing.",
                             true
                         )
-                    } else if (effective.cameraDistance < 58) {
-                        effective = effective.copy(cameraDistance = 64)
+                    } else if (effective.cameraDistance < 66) {
+                        effective = effective.copy(
+                            cameraDistance = 68,
+                            depthOfField = maxOf(effective.depthOfField, 60)
+                        )
                         decisions += ResolverDecision(
-                            "More body context",
-                            "Camera distance was increased so hips, knees, ankles and feet remain connected in a complex pose.",
+                            "More body topology context",
+                            "Camera distance and depth were increased so one pelvis, both hip origins, knees, ankles and feet remain traceable in a complex pose.",
                             true
                         )
                     }
@@ -393,6 +396,8 @@ object RenderEngine {
             RenderFidelityRules.referencePolicy(refs)
         val topology =
             RenderFidelityRules.footTopology(state)
+        val bodyTopology =
+            BodyTopologyRules.singleBodyTopologyLock(state, complexPose)
         val materialLayering =
             RenderFidelityRules.materialLayering(state, facts)
         val opticalCapture =
@@ -420,11 +425,12 @@ object RenderEngine {
         val bodyContext = if (complexPose && settings.anatomyGuard) {
             """
             BODY CONTEXT GUARD:
-            This is a complex pose. Include enough lower torso / pelvis context to make both hip origins clear.
+            This is a complex pose. Include enough lower torso / pelvis context to make BOTH hip origins from ONE pelvis clear.
             Keep BOTH knees, BOTH ankles and BOTH feet spatially readable.
             Do not crop exactly through a knee, ankle or hip joint.
             If limbs cross, preserve clear front/back ordering and continuous limb paths.
-            Pose plausibility is more important than dramatic cropping.
+            Never solve overlap by inventing a second pelvis, duplicate hip, extra buttock mass or second lower torso.
+            Pose plausibility and single-body topology are more important than dramatic cropping.
             """.trimIndent()
         } else {
             """
@@ -615,6 +621,8 @@ object RenderEngine {
 
             $topology
 
+            $bodyTopology
+
             $bodyContext
 
             VISIBILITY:
@@ -665,6 +673,7 @@ object RenderEngine {
             $resolverText
 
             NEGATIVE / AVOID:
+            ${BodyTopologyRules.negativeTerms()},
             extra toes, missing toes, fused toes, duplicated feet, detached feet,
             extra knees, missing knees, duplicated joints, impossible ankle rotation,
             broken pelvis connection, disconnected legs, telescoped limbs,
@@ -679,10 +688,11 @@ object RenderEngine {
             random duplicate limbs, duplicated accessories,
             artificial sharpening halos, fake HDR, watermark, text artifacts.
 
-            FINAL ANATOMY TRACE:
-            Before finalizing, mentally trace BOTH legs continuously:
-            pelvis -> hip -> thigh -> knee -> calf/shin -> ankle -> heel -> foot.
-            If any segment cannot be traced cleanly, correct the pose/composition before rendering.
+            FINAL BODY TOPOLOGY VALIDATION:
+            Confirm exactly ONE pelvis, TWO hip joints, TWO thighs, TWO knees, TWO lower legs, TWO ankles and TWO feet.
+            Trace LEFT pelvis socket -> left thigh -> left knee -> left shin/calf -> left ankle -> left heel -> left foot.
+            Trace RIGHT pelvis socket -> right thigh -> right knee -> right shin/calf -> right ankle -> right heel -> right foot.
+            If either chain is ambiguous, duplicated, merged, detached or requires a second pelvis, correct the pose/composition before rendering.
 
             FINAL DETAIL CHECK:
             Exactly five toes per visible foot.
