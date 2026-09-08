@@ -14,6 +14,7 @@ enum class QualityProfile(val label: String) { STANDARD("Standard"), AURA("Aura"
 
 enum class ImageEngine(val label: String) {
     GEMINI("Gemini"),
+    HF_FREE("Hugging Face Free"),
     FLUX_HOSIERY("FLUX Hosiery Lab")
 }
 

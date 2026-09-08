@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.mindlizzard.feetstudio.StudioViewModel
@@ -251,6 +252,23 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: Studi
         }
     }
 
+    if (workspace.settings.imageEngine == ImageEngine.HF_FREE) {
+        item { SectionTitle("Hugging Face Free") }
+
+        item {
+            Text(
+                "Gebruikt Hugging Face Inference Providers met de gratis maandcredits van je HF-account. " +
+                    "Om je gratis saldo niet per ongeluk op te eten, maakt deze engine altijd één afbeelding per druk op Generate.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        item { HuggingFaceTokenEditor(vm) }
+
+        item { ZeroGpuLoraLabLink() }
+    }
+
     if (workspace.settings.imageEngine == ImageEngine.FLUX_HOSIERY) {
         item { SectionTitle("FLUX Hosiery Lab") }
 
@@ -344,6 +362,82 @@ private fun ReferenceEditor(index: Int, asset: ReferenceAsset, onRole: (Referenc
             EnumChips("Role", ReferenceRole.entries, asset.role, { it.label }, onRole)
             EnumChips("Strength", ReferenceStrength.entries, asset.strength, { it.label }, onStrength)
             TextButton(onClick = onRemove, modifier = Modifier.fillMaxWidth()) { Text("Remove") }
+        }
+    }
+}
+
+@Composable
+private fun HuggingFaceTokenEditor(vm: StudioViewModel) {
+    var value by remember {
+        mutableStateOf(
+            vm.huggingFaceTokenForEditor()
+        )
+    }
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = { value = it },
+            label = {
+                Text("HF token")
+            },
+            visualTransformation =
+                PasswordVisualTransformation(),
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Button(
+            onClick = {
+                vm.saveHuggingFaceToken(value)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Save HF token")
+        }
+
+        Text(
+            "Maak op Hugging Face een token met Inference Providers-toegang. " +
+                "De token wordt encrypted opgeslagen in Android Keystore.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun ZeroGpuLoraLabLink() {
+    val uriHandler =
+        LocalUriHandler.current
+
+    Column(
+        verticalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
+        SectionTitle(
+            "Echt gratis ZeroGPU panty-LoRA"
+        )
+
+        Text(
+            "Voor de gespecialiseerde Sheer 15D LoRA kun je de openbare ZeroGPU FLUX LoRA Lab gebruiken. " +
+                "Custom LoRA: Muapi/sheer-tights-pantyhose. Trigger: 15tights. " +
+                "Deze route draait buiten Feet Studio en gebruikt je dagelijkse ZeroGPU-quota.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        OutlinedButton(
+            onClick = {
+                uriHandler.openUri(
+                    "https://huggingface.co/spaces/multimodalart/flux-lora-lab"
+                )
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open gratis ZeroGPU LoRA Lab")
         }
     }
 }

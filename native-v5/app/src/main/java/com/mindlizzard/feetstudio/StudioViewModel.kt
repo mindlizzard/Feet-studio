@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mindlizzard.feetstudio.ai.GeminiClient
+import com.mindlizzard.feetstudio.ai.HuggingFaceFreeClient
 import com.mindlizzard.feetstudio.ai.MuapiFluxClient
 import com.mindlizzard.feetstudio.data.DeviceExportRepository
 import com.mindlizzard.feetstudio.data.GalleryRepository
+import com.mindlizzard.feetstudio.data.HuggingFaceKeyStore
 import com.mindlizzard.feetstudio.data.MuapiKeyStore
 import com.mindlizzard.feetstudio.data.SecureKeyStore
 import com.mindlizzard.feetstudio.domain.DesignState
@@ -37,16 +39,19 @@ data class StudioUiState(
     val progress: String = "",
     val error: String? = null,
     val apiKeyPresent: Boolean = false,
-    val muapiKeyPresent: Boolean = false
+    val muapiKeyPresent: Boolean = false,
+    val hfKeyPresent: Boolean = false
 )
 
 class StudioViewModel(application: Application) : AndroidViewModel(application) {
     private val keyStore = SecureKeyStore(application)
     private val muapiKeyStore = MuapiKeyStore(application)
+    private val hfKeyStore = HuggingFaceKeyStore(application)
     private val galleryRepo = GalleryRepository(application)
     private val exportRepo = DeviceExportRepository(application)
     private val gemini = GeminiClient(application.contentResolver)
     private val flux = MuapiFluxClient()
+    private val hfFree = HuggingFaceFreeClient()
     private val undo = ArrayDeque<WorkspaceState>()
     private val redo = ArrayDeque<WorkspaceState>()
 
@@ -54,7 +59,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         StudioUiState(
             gallery = galleryRepo.list(),
             apiKeyPresent = keyStore.loadApiKey().isNotBlank(),
-            muapiKeyPresent = muapiKeyStore.loadApiKey().isNotBlank()
+            muapiKeyPresent = muapiKeyStore.loadApiKey().isNotBlank(),
+            hfKeyPresent = hfKeyStore.loadToken().isNotBlank()
         )
     )
     val ui: StateFlow<StudioUiState> = _ui.asStateFlow()
@@ -174,6 +180,25 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
 
     fun muapiKeyForEditor(): String = muapiKeyStore.loadApiKey()
 
+
+    fun saveHuggingFaceToken(value: String) {
+        runCatching {
+            hfKeyStore.saveToken(value)
+        }.onSuccess {
+            _ui.value = _ui.value.copy(
+                hfKeyPresent = hfKeyStore.loadToken().isNotBlank(),
+                error = null
+            )
+        }.onFailure {
+            _ui.value = _ui.value.copy(
+                error = it.message ?: "Ongeldig Hugging Face token."
+            )
+        }
+    }
+
+    fun huggingFaceTokenForEditor(): String =
+        hfKeyStore.loadToken()
+
     fun previewContract(): RenderContract =
         RenderEngine.buildContract(
             _ui.value.workspace,
@@ -194,6 +219,7 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         val settings = _ui.value.workspace.settings
         val geminiKey = keyStore.loadApiKey()
         val muapiKey = muapiKeyStore.loadApiKey()
+        val hfToken = hfKeyStore.loadToken()
 
         if (settings.imageEngine == ImageEngine.GEMINI && geminiKey.isBlank()) {
             _ui.value = _ui.value.copy(
@@ -212,6 +238,17 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             return
         }
 
+
+        if (
+            settings.imageEngine == ImageEngine.HF_FREE &&
+            hfToken.isBlank()
+        ) {
+            _ui.value = _ui.value.copy(
+                error = "Vul eerst je Hugging Face token in voor HF Free."
+            )
+            return
+        }
+
         viewModelScope.launch {
             _ui.value = _ui.value.copy(
                 loading = true,
@@ -219,7 +256,10 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             try {
-                val batch = settings.batchCount.coerceIn(1, 4)
+                // HF Free beschermt de kleine maandelijkse gratis credits.
+                val batch = if (
+                    settings.imageEngine == ImageEngine.HF_FREE
+                ) 1 else settings.batchCount.coerceIn(1, 4)
 
                 repeat(batch) { index ->
                     val contract = previewContract()
@@ -266,6 +306,28 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                                     }
 
                                 finalBytes to contract
+                            }
+
+                            ImageEngine.HF_FREE -> {
+                                _ui.value = _ui.value.copy(
+                                    progress =
+                                        "Hugging Face Free ${index + 1}/$batch"
+                                )
+
+                                val bytes = withContext(Dispatchers.IO) {
+                                    hfFree.generate(
+                                        token = hfToken,
+                                        contract = contract
+                                    )
+                                }
+
+                                val hfContract = contract.copy(
+                                    model =
+                                        "HF Free: ${HuggingFaceFreeClient.MODEL}",
+                                    imageSize = "HF Inference"
+                                )
+
+                                bytes to hfContract
                             }
 
                             ImageEngine.FLUX_HOSIERY -> {
