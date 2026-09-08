@@ -402,6 +402,8 @@ object RenderEngine {
             RenderFidelityRules.materialLayering(state, facts)
         val opticalCapture =
             RenderFidelityRules.opticalCapture(state, settings)
+        val photographicRealism =
+            PhotographicRealismRules.prompt(state, settings, facts)
         val sceneCameraHarmony =
             RenderFidelityRules.sceneCameraHarmony(state, facts)
         val auraPromptIntent =
@@ -664,6 +666,8 @@ object RenderEngine {
             $lighting
 
             $opticalCapture
+
+            $photographicRealism
 
             $sceneCameraHarmony
 

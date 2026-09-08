@@ -1,4 +1,4 @@
-name: Build Feet Studio v5.7.3 Native APK
+name: Build Feet Studio v5.7.4 Native APK
 
 on:
   workflow_dispatch:
@@ -48,15 +48,15 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p release
-          cp native-v5/app/build/outputs/apk/debug/app-debug.apk release/Feet-Studio-v5.7.3-Native-debug.apk
+          cp native-v5/app/build/outputs/apk/debug/app-debug.apk release/Feet-Studio-v5.7.4-Native-debug.apk
 
       - name: Upload native APK
         id: upload_primary
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: Feet-Studio-v5.7.3-Native-APK
-          path: release/Feet-Studio-v5.7.3-Native-debug.apk
+          name: Feet-Studio-v5.7.4-Native-APK
+          path: release/Feet-Studio-v5.7.4-Native-debug.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -64,8 +64,8 @@ jobs:
         if: steps.upload_primary.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: Feet-Studio-v5.7.3-Native-APK
-          path: release/Feet-Studio-v5.7.3-Native-debug.apk
+          name: Feet-Studio-v5.7.4-Native-APK
+          path: release/Feet-Studio-v5.7.4-Native-debug.apk
           if-no-files-found: error
           retention-days: 30
           overwrite: true

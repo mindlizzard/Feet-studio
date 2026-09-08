@@ -401,10 +401,14 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         - keep hosiery continuous over knees, calves, ankles and feet
 
         Then improve photographic fidelity:
-        - sharpen real existing texture, not fake crunchy detail
-        - improve hosiery weave, skin microtexture, nail edges and shoe seams
-        - restore natural contact shadows and believable material highlights
-        - remove mushy AI blur, waxy skin and painterly artifacts
+        - preserve natural exposure with smooth highlight roll-off and readable shadow detail
+        - sharpen only real existing texture near the true focus plane, never fake crunchy detail
+        - improve hosiery weave according to its denier, without enlarging fibers into coarse mesh
+        - keep skin microtexture natural, with no waxy smoothing, oil/latex sheen or porcelain finish
+        - keep nylon, skin and footwear visually distinct through different roughness and highlight width
+        - restore natural contact shadows at feet, hosiery folds and shoe openings
+        - preserve optical depth falloff and avoid cut-out background blur
+        - remove mushy AI blur, repeated texture, HDR halos and painterly artifacts
         - preserve the same identity, pose intent, outfit, scene, crop and lighting
         - keep every enabled reference locked to its assigned role and strength
         - do not let a style reference change anatomy, pose, footwear or hosiery
