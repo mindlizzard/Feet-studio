@@ -16,49 +16,60 @@ object HosieryFluxPromptCompiler {
 
         val hosiery = if (d.hosieryType == HosieryType.FISHNET) {
             "${d.hosieryType.label}, ${d.meshSize.name.lowercase()} mesh, " +
-                "thread thickness ${d.meshThickness}/100, tension ${d.hosieryTension}/100"
+                "thread ${d.meshThickness}/100, tension ${d.hosieryTension}/100"
         } else {
             "${d.hosieryType.label}, ${d.denier.label}, ${d.hosieryPattern.label}, " +
-                "${d.hosieryFinish.name.lowercase()} finish, " +
-                "tension ${d.hosieryTension}/100, compression ${d.hosieryCompression}/100"
+                "${d.hosieryFinish.name.lowercase()} finish, tension ${d.hosieryTension}/100, " +
+                "compression ${d.hosieryCompression}/100"
+        }
+
+        val layerRule = when {
+            d.hosieryType == HosieryType.NONE ->
+                "No hosiery layer. Do not invent nylon, seams or mesh."
+            d.hosieryType == HosieryType.FISHNET ->
+                "Open cells stay physically open; threads wrap around curvature and cast tiny contact shadows."
+            d.denier == Denier.D60 || d.denier == Denier.D100 ->
+                "Opaque fabric hides pores and nail polish beneath it."
+            else ->
+                "Sheer fabric filters skin/nail color through real fibers; stretched regions change transparency gradually."
         }
 
         return """
-            Photorealistic adult fashion editorial photograph.
-            One coherent adult subject, age ${d.modelAge}. ${preset.triggerWord}.
-            Primary material study: $hosiery, color ${ColorCatalog.describe(d.hosieryColor)}.
-            Preserve realistic nylon / hosiery fiber structure, transparency, weave direction,
-            stretch, compression, tiny wrinkles, contact shadows and natural highlight roll-off.
-            Fabric must wrap continuously around thighs, knees, calves, ankles, heels, toes and soles
-            according to the selected garment. Do not paint hosiery as a flat texture.
+            Photorealistic adult fashion editorial photograph. One coherent adult subject, age ${d.modelAge}.
+            ${preset.triggerWord}. Primary material study: $hosiery, color ${ColorCatalog.describe(d.hosieryColor)}.
 
-            Anatomy: both legs belong to one body and trace continuously
-            pelvis -> hip -> thigh -> knee -> shin/calf -> ankle -> heel -> foot.
-            Exactly five toes per visible foot. Natural left/right orientation.
-            No duplicate knees, detached feet, twisted shins or impossible ankle rotation.
+            HOSIERY PHYSICS:
+            Real nylon/fiber structure, weave direction, stretch, compression, tiny wrinkles,
+            contact shadows and natural highlight roll-off. Fabric wraps continuously around
+            thighs, knees, calves, ankles, heels, toes and soles according to the garment.
+            $layerRule No painted-on texture, random transparency holes or broken fabric continuity.
+
+            LAYER ORDER:
+            skin -> hosiery -> footwear where present. Footwear: $footwear.
+            Straps/openings sit over hosiery at real pressure points. Closed footwear occludes
+            toes inside one coherent shoe volume. No fabric through soles, no shoe through toes,
+            no floating straps, doubled heels or melted toe boxes.
+
+            ANATOMY:
+            One pelvis and two coherent legs. Trace each leg pelvis -> hip -> thigh -> knee ->
+            shin/calf -> ankle -> heel -> foot. Exactly five toes per visible foot.
+            Each foot is continuous ankle -> heel -> arch -> forefoot -> five toes.
+            Natural left/right orientation. No duplicate knees, detached feet, twisted shins,
+            fused toes or impossible ankle rotation.
 
             Foot geometry: ${d.footShape.label}, ${d.archType.label}, EU ${d.shoeSize}.
-            Footwear: $footwear.
-            If footwear is worn, keep one mechanically coherent shoe per intended foot.
-            Preserve toe box, heel cup, sole, straps and shoe opening without warping.
-
             Pose: ${d.pose.label}.
-            Camera: ${d.cameraAngle.label}, ${d.lens.label},
-            orbit azimuth ${d.cameraAzimuth} degrees around the subject,
-            focus target vertical ${d.cameraFocusY}/100,
-            distance ${d.cameraDistance}/100, height ${d.cameraHeight}/100,
-            tilt ${d.cameraTilt} degrees, roll ${d.cameraRoll} degrees.
-            Scene: ${d.scene.label}. Surface/contact: ${d.surface}.
-            Lighting: ${d.lighting.label}, ${d.filmStock.label}.
+            Camera: ${d.cameraAngle.label}, ${d.lens.label}, azimuth ${d.cameraAzimuth} degrees,
+            focus ${d.cameraFocusY}/100, distance ${d.cameraDistance}/100,
+            height ${d.cameraHeight}/100, tilt ${d.cameraTilt}, roll ${d.cameraRoll}.
+            Scene: ${d.scene.label}; contact surface: ${d.surface}.
+            Lighting: ${d.lighting.label}; film: ${d.filmStock.label}.
 
-            Quality: ${s.qualityProfile.label}. Premium camera realism,
-            crisp natural microdetail, realistic skin texture, sharp hosiery threads,
-            clean shoe seams, plausible depth of field, no waxy smoothing,
-            no watercolor blur, no fake HDR, no AI-melted anatomy.
-
-            Avoid: duplicated limbs, extra toes, fused toes, extra shoes, melted shoes,
-            random transparency holes, broken hosiery continuity, painted-on mesh,
-            watermark, logos or text artifacts unless specifically requested.
+            QUALITY ${s.qualityProfile.label}:
+            crisp real microdetail at the intended focus plane, distinct hosiery fibers,
+            believable skin texture, clean shoe seams, real contact shadows, optical depth falloff.
+            No waxy smoothing, fake HDR, sharpening halos, watercolor blur, CGI sheen,
+            duplicated limbs, extra toes, text or watermark.
         """.trimIndent().take(2950)
     }
 }

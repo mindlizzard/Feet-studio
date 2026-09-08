@@ -350,7 +350,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: Studi
     } else if (workspace.settings.qualityProfile == QualityProfile.AURA) {
         item {
             Text(
-                "Aura geeft strengere anatomie, scherper materiaal-detail en natuurlijkere fotografie zonder extra tweede pass.",
+                "Aura gebruikt in Quality/Pro automatisch het Pro image-model en minimaal 2K. Het blijft één image-call, maar zet sterker in op anatomie, reference fidelity en echt materiaal-detail.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -365,6 +365,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: Studi
     if (workspace.settings.mode == StudioMode.PRO) item { IntSlider("Variation strength", workspace.settings.variationStrength) { v -> vm.updateSettings { it.copy(variationStrength = v) } } }
 
     item { SectionTitle("References") }
+    item {
+        Text(
+            "Role isolation: Exact/Strong referenties sturen alleen hun gekozen rol. Een pose-ref mag dus niet stilletjes je schoenen of hosiery vervangen.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
     item { OutlinedButton(onClick = onPickReferences, modifier = Modifier.fillMaxWidth()) { Text("Add references (${references.size}/5)") } }
     if (references.isNotEmpty()) {
         items(references.indices.toList()) { index ->

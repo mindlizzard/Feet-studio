@@ -103,7 +103,7 @@ fun FeetStudioApp(vm: StudioViewModel = viewModel()) {
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Feet Studio v5.6.4.2") },
+                title = { Text("Feet Studio v5.7") },
                 navigationIcon = {
                     IconButton(onClick = { viewerRecord = ui.active }) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = null)
@@ -163,6 +163,18 @@ fun FeetStudioApp(vm: StudioViewModel = viewModel()) {
                     ui.active?.let {
                         vm.targetedFix(FixTarget.REALISM)
                         notice = "Realism fix gestart"
+                    } ?: run {
+                        notice = "Kies eerst een render"
+                    }
+                },
+                onReferenceFix = {
+                    ui.active?.let {
+                        if (ui.references.none { ref -> ref.enabled }) {
+                            notice = "Voeg eerst een ingeschakelde referentie toe"
+                        } else {
+                            vm.targetedFix(FixTarget.REFERENCE)
+                            notice = "Reference fidelity fix gestart"
+                        }
                     } ?: run {
                         notice = "Kies eerst een render"
                     }
@@ -260,6 +272,7 @@ private fun SectionBar(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ActiveRenderPanel(
     active: RenderRecord?,
@@ -267,6 +280,7 @@ private fun ActiveRenderPanel(
     progress: String,
     onOpenViewer: () -> Unit,
     onRealismFix: () -> Unit,
+    onReferenceFix: () -> Unit,
     onUseAsReference: () -> Unit
 ) {
     ElevatedCard(
@@ -300,12 +314,28 @@ private fun ActiveRenderPanel(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onOpenViewer, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Button(
+                        onClick = onOpenViewer,
+                        contentPadding = PaddingValues(
+                            horizontal = 14.dp,
+                            vertical = 10.dp
+                        )
+                    ) {
                         Text("Open")
                     }
-                    TextButton(onClick = onRealismFix) { Text("Realism fix") }
-                    TextButton(onClick = onUseAsReference) { Text("Use as ref") }
+                    TextButton(onClick = onRealismFix) {
+                        Text("Realism fix")
+                    }
+                    TextButton(onClick = onReferenceFix) {
+                        Text("Ref fix")
+                    }
+                    TextButton(onClick = onUseAsReference) {
+                        Text("Use as ref")
+                    }
                 }
             }
         }

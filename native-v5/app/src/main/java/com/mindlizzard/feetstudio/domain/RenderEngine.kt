@@ -27,24 +27,38 @@ object RenderEngine {
             manifest
         )
 
-        val forceUltra = workspace.settings.qualityProfile == QualityProfile.ULTRA
+        val forceUltra =
+            workspace.settings.qualityProfile == QualityProfile.ULTRA
+
+        val forceAuraQuality =
+            workspace.settings.qualityProfile == QualityProfile.AURA &&
+                workspace.settings.renderMode != RenderMode.FAST
 
         val model = if (
-            workspace.settings.renderMode == RenderMode.PRO || forceUltra
+            workspace.settings.renderMode == RenderMode.PRO ||
+            forceUltra ||
+            forceAuraQuality
         ) {
             "gemini-3-pro-image"
         } else {
             "gemini-3.1-flash-image"
         }
 
-        val imageSize = if (forceUltra) {
-            "4K"
-        } else {
-            when (workspace.settings.resolution) {
-                Resolution.K1 -> "1K"
-                Resolution.K2 -> "2K"
-                Resolution.K4 -> "4K"
-            }
+        val imageSize = when {
+            forceUltra -> "4K"
+
+            forceAuraQuality ->
+                when (workspace.settings.resolution) {
+                    Resolution.K4 -> "4K"
+                    else -> "2K"
+                }
+
+            else ->
+                when (workspace.settings.resolution) {
+                    Resolution.K1 -> "1K"
+                    Resolution.K2 -> "2K"
+                    Resolution.K4 -> "4K"
+                }
         }
 
         return RenderContract(
@@ -306,6 +320,22 @@ object RenderEngine {
             }
         }
 
+        if (
+            settings.anatomyGuard &&
+            effective.cameraFocusY >= 79 &&
+            effective.cameraDistance >= 60 &&
+            effective.depthOfField < 52
+        ) {
+            effective = effective.copy(
+                depthOfField = 56
+            )
+            decisions += ResolverDecision(
+                "Focus depth stabilized",
+                "Feet are the focus in a wider composition, so depth of field was increased enough to keep ankle and leg continuity readable.",
+                true
+            )
+        }
+
         val facts = derive(effective)
 
         if (
@@ -360,6 +390,14 @@ object RenderEngine {
         refs: List<String>
     ): String {
         val complexPose = isComplexPose(state.pose)
+        val referenceFidelity =
+            RenderFidelityRules.referencePolicy(refs)
+        val topology =
+            RenderFidelityRules.footTopology(state)
+        val materialLayering =
+            RenderFidelityRules.materialLayering(state, facts)
+        val opticalCapture =
+            RenderFidelityRules.opticalCapture(state, settings)
 
         val anatomy = """
             One coherent adult subject, age ${state.modelAge}. EU shoe size ${state.shoeSize}.
@@ -605,8 +643,12 @@ object RenderEngine {
             REFERENCE MANIFEST:
             $refText
 
+            $referenceFidelity
+
             SUBJECT / ANATOMY:
             $anatomy
+
+            $topology
 
             $bodyContext
 
@@ -625,6 +667,8 @@ object RenderEngine {
 
             HOSIERY:
             $hosiery
+
+            $materialLayering
 
             FOOTWEAR:
             $footwear
@@ -645,6 +689,8 @@ object RenderEngine {
 
             LIGHTING / FILM:
             $lighting
+
+            $opticalCapture
 
             RESOLVER:
             $resolverText

@@ -54,8 +54,8 @@ enum class HosieryLoraPreset(
 enum class FootShape(val label: String) {
     GREEK("Greek / second toe longer"), EGYPTIAN("Egyptian / tapered"), ROMAN("Roman / square"),
     PEASANT("Broad / peasant"), MOUNTAIN_PEAK("Mountain peak"), PETITE("Petite"), SLENDER("Slender / model"),
-    EAST_ASIAN("East Asian / petite"), ARABIC("Arabic / Middle Eastern"), SOUTH_ASIAN("South Asian"),
-    LATINA("Latina / South American"), NORDIC("Nordic / Scandinavian"), AFRICAN("African / deep melanin")
+    EAST_ASIAN("Petite tapered"), ARABIC("High instep tapered"), SOUTH_ASIAN("Balanced medium-width"),
+    LATINA("Curved heel tapered"), NORDIC("Long narrow"), AFRICAN("Broad forefoot rounded")
 }
 
 enum class ArchType(val label: String) {
@@ -323,4 +323,4 @@ data class RenderRecord(
     val fixTarget: String? = null
 )
 
-enum class FixTarget { ANATOMY, HOSIERY, NAILS, FOOTWEAR, POSE, REALISM }
+enum class FixTarget { ANATOMY, HOSIERY, NAILS, FOOTWEAR, POSE, REFERENCE, REALISM }

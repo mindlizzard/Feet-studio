@@ -294,7 +294,8 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
                                                 gemini.generate(
                                                     apiKey = geminiKey,
                                                     contract = contract,
-                                                    references = emptyList(),
+                                                    references =
+                                                        _ui.value.references,
                                                     sourceImage = firstPass,
                                                     editInstruction =
                                                         ultraRefineInstruction()
@@ -400,6 +401,10 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         - restore natural contact shadows and believable material highlights
         - remove mushy AI blur, waxy skin and painterly artifacts
         - preserve the same identity, pose intent, outfit, scene, crop and lighting
+        - keep every enabled reference locked to its assigned role and strength
+        - do not let a style reference change anatomy, pose, footwear or hosiery
+        - preserve physical layer order: skin -> hosiery -> footwear
+        - keep fine detail local to the true focus plane; do not globally oversharpen
 
         Do not add limbs, toes, shoes, accessories, text or decorative elements.
     """.trimIndent()
@@ -411,6 +416,16 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
         if (apiKey.isBlank()) {
             _ui.value = _ui.value.copy(
                 error = "Targeted Fix gebruikt Gemini. Vul eerst je Gemini API-key in."
+            )
+            return
+        }
+
+        if (
+            target == FixTarget.REFERENCE &&
+            _ui.value.references.none { it.enabled }
+        ) {
+            _ui.value = _ui.value.copy(
+                error = "Reference Fidelity Fix heeft minimaal één ingeschakelde referentie nodig."
             )
             return
         }
@@ -446,6 +461,27 @@ class StudioViewModel(application: Application) : AndroidViewModel(application) 
             FixTarget.POSE -> """
                 Correct only physically implausible body/leg/foot pose.
                 Preserve pose intent but restore plausible pelvis, knee and ankle articulation.
+            """.trimIndent()
+
+            FixTarget.REFERENCE -> """
+                REFERENCE FIDELITY REPAIR.
+
+                Keep this same image and composition.
+                Re-align only the visible properties that belong to each enabled reference role:
+                foot shape reference -> foot proportions only;
+                skin reference -> visible skin character only;
+                nails reference -> nail plates/polish only;
+                hosiery reference -> fabric/weave/transparency only;
+                footwear reference -> shoe construction only;
+                pose reference -> articulation only;
+                camera reference -> framing/perspective only;
+                scene reference -> environment only;
+                style reference -> photographic finish only.
+
+                Respect EXACT > STRONG > GUIDED > INSPIRATION.
+                Never import unrelated identity, clothing, pose, scene or anatomy from the wrong role.
+                Repair physical anatomy first if literal copying would require impossible geometry.
+                Preserve all unrelated visible details.
             """.trimIndent()
 
             FixTarget.REALISM -> """
