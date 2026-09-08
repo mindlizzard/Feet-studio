@@ -45,7 +45,7 @@ class GeminiClient(
 
         references
             .filter { it.enabled }
-            .sortedBy { it.strength.ordinal }
+            .sortedWith(compareBy<ReferenceAsset>({ refStrengthPriority(it) }, { refRolePriority(it) }))
             .take(5)
             .forEachIndexed { index, ref ->
                 input.put(
@@ -109,6 +109,26 @@ class GeminiClient(
             return extractImage(raw)
                 ?: throw IllegalStateException("Gemini gaf geen afbeelding terug.")
         }
+    }
+
+    private fun refStrengthPriority(ref: ReferenceAsset): Int = when (ref.strength.name.lowercase()) {
+        "exact" -> 0
+        "strong" -> 1
+        "guided" -> 2
+        else -> 3
+    }
+
+    private fun refRolePriority(ref: ReferenceAsset): Int = when (ref.role.name.lowercase()) {
+        "hosiery" -> 0
+        "foot_shape" -> 1
+        "footwear" -> 2
+        "pose" -> 3
+        "camera" -> 4
+        "scene" -> 5
+        "style" -> 6
+        "skin" -> 7
+        "nails" -> 8
+        else -> 9
     }
 
     private fun buildReferenceGuide(index: Int, ref: ReferenceAsset): String {

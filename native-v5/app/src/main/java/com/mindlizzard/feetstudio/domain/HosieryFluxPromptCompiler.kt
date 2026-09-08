@@ -13,6 +13,8 @@ object HosieryFluxPromptCompiler {
         }
 
         val hosiery = RenderFidelityRules.hosieryMasterBlock(d, facts)
+        val harmony = RenderFidelityRules.sceneCameraHarmony(d, facts)
+        val auraIntent = RenderFidelityRules.auraPromptIntent(s, d, facts)
 
         return """
             Photorealistic adult fashion editorial photograph. One coherent adult subject, age ${d.modelAge}.
@@ -42,11 +44,15 @@ object HosieryFluxPromptCompiler {
             Scene: ${d.scene.label}; contact surface: ${d.surface}.
             Lighting: ${d.lighting.label}; film: ${d.filmStock.label}.
 
+            $harmony
+
+            $auraIntent
+
             QUALITY ${s.qualityProfile.label}:
             crisp real microdetail at the intended focus plane, distinct hosiery fibers,
             believable skin texture, clean shoe seams, real contact shadows, optical depth falloff.
             No waxy smoothing, fake HDR, sharpening halos, watercolor blur, CGI sheen,
             duplicated limbs, extra toes, text or watermark.
-        """.trimIndent().take(3200)
+        """.trimIndent().take(3400)
     }
 }

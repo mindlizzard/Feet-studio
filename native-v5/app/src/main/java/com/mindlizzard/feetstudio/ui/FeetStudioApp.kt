@@ -103,7 +103,7 @@ fun FeetStudioApp(vm: StudioViewModel = viewModel()) {
         contentWindowInsets = WindowInsets.navigationBars,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Feet Studio v5.7.1") },
+                title = { Text("Feet Studio v5.7.2") },
                 navigationIcon = {
                     IconButton(onClick = { viewerRecord = ui.active }) {
                         Icon(Icons.Default.PhotoLibrary, contentDescription = null)

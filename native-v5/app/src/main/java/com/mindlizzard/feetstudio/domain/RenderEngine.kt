@@ -397,6 +397,10 @@ object RenderEngine {
             RenderFidelityRules.materialLayering(state, facts)
         val opticalCapture =
             RenderFidelityRules.opticalCapture(state, settings)
+        val sceneCameraHarmony =
+            RenderFidelityRules.sceneCameraHarmony(state, facts)
+        val auraPromptIntent =
+            RenderFidelityRules.auraPromptIntent(settings, state, facts)
 
         val anatomy = """
             One coherent adult subject, age ${state.modelAge}. EU shoe size ${state.shoeSize}.
@@ -652,6 +656,10 @@ object RenderEngine {
             $lighting
 
             $opticalCapture
+
+            $sceneCameraHarmony
+
+            $auraPromptIntent
 
             RESOLVER:
             $resolverText

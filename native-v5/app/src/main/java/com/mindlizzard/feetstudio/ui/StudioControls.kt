@@ -367,7 +367,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderItems(vm: Studi
     item { SectionTitle("References") }
     item {
         Text(
-            "Role isolation: Exact/Strong referenties sturen alleen hun gekozen rol. Een pose-ref mag dus niet stilletjes je schoenen of hosiery vervangen.",
+            "Role isolation: Exact/Strong referenties sturen alleen hun gekozen rol. v5.7.2 voegt ook betere Aura-tuning toe voor denier, scene-camera harmonie en slimmere reference-prioriteit.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

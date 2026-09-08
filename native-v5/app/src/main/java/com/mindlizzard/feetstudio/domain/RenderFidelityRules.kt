@@ -107,6 +107,19 @@ object RenderFidelityRules {
         """.trimIndent()
     }
 
+    fun hosieryPresetLabel(state: DesignState, facts: DerivedFacts): String {
+        if (!facts.wearingHosiery) return "bare-foot realism"
+        if (facts.fishnet) return "fishnet editorial"
+        return when (state.denier.name) {
+            "D5" -> "ultra-sheer editorial"
+            "D15" -> "classic sheer pantyhose"
+            "D30" -> "semi-sheer everyday elegance"
+            "D60" -> "near-opaque refined knit"
+            "D100" -> "opaque fashion hosiery"
+            else -> "balanced hosiery realism"
+        }
+    }
+
     fun materialLayering(state: DesignState, facts: DerivedFacts): String {
         val hosieryLayer = when {
             !facts.wearingHosiery -> "No hosiery layer exists. Do not invent nylon sheen, seams or mesh."
@@ -151,10 +164,50 @@ object RenderFidelityRules {
         """.trimIndent()
     }
 
+    fun sceneCameraHarmony(state: DesignState, facts: DerivedFacts): String {
+        val lensText = when (state.lens.name) {
+            "L24" -> "Use wider environmental storytelling. Keep edge distortion controlled and do not stretch feet unnaturally at frame edges."
+            "L35" -> "Balanced documentary framing. Preserve a natural room feel while keeping subject proportions believable."
+            "L50" -> "Classic neutral perspective. Prioritize true-to-life proportions and clean framing."
+            "L85" -> "Compressed portrait/editorial perspective. Use elegant separation and clean background simplification."
+            else -> "Maintain perspective discipline appropriate to the selected lens."
+        }
+        val angleText = when (state.cameraAngle.name) {
+            "GROUND" -> "Ground-level angle should emphasize the foot plane while keeping ankles and lower legs coherent."
+            "TOP" -> "Top angle should keep leg flow readable and avoid flattening depth into pasted layers."
+            "SIDE" -> "Side angle should preserve silhouette clarity and clean profile separation."
+            else -> "Keep a stable front-oriented composition with coherent body alignment."
+        }
+        return """
+            SCENE / CAMERA HARMONY:
+            ${hosieryPresetLabel(state, facts)}.
+            $lensText
+            $angleText
+            Surface '${state.surface}' and scene '${state.scene.label}' must support the subject naturally,
+            with real contact, weight and believable grounding.
+        """.trimIndent()
+    }
+
+    fun auraPromptIntent(settings: StudioSettings, state: DesignState, facts: DerivedFacts): String {
+        val qualityMode = when (settings.qualityProfile) {
+            QualityProfile.STANDARD -> "clean realism"
+            QualityProfile.AURA -> "Aura-grade fashion realism"
+            QualityProfile.ULTRA -> "master-detail realism"
+        }
+        return """
+            AURA RENDER INTENT:
+            Target $qualityMode with emphasis on ${hosieryPresetLabel(state, facts)}.
+            Prefer one coherent photographic interpretation over overprocessing.
+            Prioritize correct anatomy, real textile behavior, reference-role discipline,
+            and believable camera optics before decorative stylization.
+        """.trimIndent()
+    }
+
     fun hosieryMasterBlock(state: DesignState, facts: DerivedFacts): String {
         if (!facts.wearingHosiery) return "No hosiery. Bare skin is visible where footwear does not cover the feet."
         if (facts.fishnet) {
             return """
+                Hosiery preset: ${hosieryPresetLabel(state, facts)}.
                 Hosiery: ${state.hosieryType.label}, color ${ColorCatalog.describe(state.hosieryColor)},
                 pattern ${state.hosieryPattern.label}, ${state.meshSize.name.lowercase()} mesh,
                 thread thickness ${state.meshThickness}/100.
@@ -169,6 +222,7 @@ object RenderFidelityRules {
             """.trimIndent()
         }
         return """
+            Hosiery preset: ${hosieryPresetLabel(state, facts)}.
             Hosiery: ${state.hosieryType.label}, ${state.denier.label},
             pattern ${state.hosieryPattern.label}, color ${ColorCatalog.describe(state.hosieryColor)}.
 
